@@ -1,5 +1,19 @@
-# Secret
+# Secret
 .env
+
+# Composer
+/vendor/
+
+# Test & static analysis cache
+.phpunit.result.cache
+/.phpunit.cache/
+/coverage/
+
+# Runtime data
+/storage/logs/*
+/storage/cache/*
+/public/uploads/*
+!.gitkeep
 
 # IDE
 .idea/
