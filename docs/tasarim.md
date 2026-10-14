@@ -298,6 +298,7 @@ sequenceDiagram
         S-->>C: SlotAlreadyBookedException
         C-->>T: 409 Conflict / "Seçilen saat dolmuştur, reddedildi"
     end
+```
 
 ## 4. ER diyagramı
 
