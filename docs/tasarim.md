@@ -607,7 +607,7 @@ sequenceDiagram
 
 ## 4. ER diyagramı
 
-Bu bölüm, Aşama 3'te kurulacak veritabanının planıdır ve sınıf diyagramındaki model sınıflarından türetilmiştir. Varlık ve öznitelik adları sınıf diyagramındakilerle aynıdır. Aşama 2'de JSON dosyaları kullanılsa bile her dosya aşağıdaki tablolardan birini izler; böylece veritabanına geçiş kolay olur.
+Bu bölüm, Aşama 3'te kurulacak veritabanının planıdır. Aşama 2'de JSON dosyaları kullanılsa bile her dosya aşağıdaki tablolardan birini izler; böylece veritabanına geçiş kolay olur.
 
 ### 4.1 Sınıflardan varlıklara
 
@@ -625,11 +625,10 @@ Bu bölüm, Aşama 3'te kurulacak veritabanının planıdır ve sınıf diyagram
 | Slot | (kaydedilmez) | `SlotService`, Schedule ve TimeOff kayıtlarından, alınmış randevuları çıkararak anlık hesaplar |
 | AppointmentService, SlotService, WaitlistService, AppointmentRepositoryInterface | (tablo değil) | İş mantığı ve erişim katmanı sınıflarıdır, veri tutmazlar |
 
-Sütun adları sınıf diyagramındaki öznitelik adlarıyla aynıdır (`passwordHash`, `startTime`, `offerExpiresAt` gibi).
 
 ### 4.2 ER diyagramı (Chen gösterimi)
 
-Okunabilirlik için diyagram iki parçaya bölünmüştür; ikisi de aynı varlıkları kullanır. Mermaid'de Chen için hazır bir komut olmadığından `flowchart` ile çizilmiştir. Yabancı anahtarlar (`polyclinicId`, `doctorId`, `patientId`) Chen gösteriminde öznitelik olarak çizilmez; ilişki eşkenar dörtgeni bunları temsil eder (tablodaki karşılıkları 4.3'te). `ISA` ("is a"), Patient ve Doctor'un birer User olduğunu, yani kalıtımı gösterir.
+Okunabilirlik için diyagram iki parçaya bölünmüştür; ikisi de aynı varlıkları kullanır.`ISA` ("is a"), Patient ve Doctor'un birer User olduğunu, yani kalıtımı gösterir.
 
 **Şekil 4.1: Kullanıcılar, doktor ve çalışma planı**
 
@@ -714,7 +713,7 @@ flowchart TB
 
 ### 4.3 Tablolar, anahtarlar ve ilişkiler
 
-Diyagramdaki varlıkların veritabanındaki karşılığı (PK birincil, FK yabancı, UK benzersiz anahtar):
+Diyagramdaki varlıkların veritabanındaki karşılığı:
 
 | Tablo | Sütunlar | Yabancı anahtarlar |
 | --- | --- | --- |
@@ -754,7 +753,7 @@ Veritabanı düzeyinde ek kısıtlar:
 | 3NF | Anahtar olmayan hiçbir sütun başka bir anahtar olmayan sütuna bağlı değildir. `appointments` içinde hasta adı, doktor adı veya poliklinik tutulmaz; yalnızca `patientId` ve `doctorId` vardır. Doktorun polikliniği `doctors.polyclinicId` üzerinden, ad ve e-posta bilgisi `users` üzerinden gelir. Randevunun bitiş saati de saklanmaz; `schedules.slotDuration` değerinden hesaplanır. |
 
 ### 4.5 Gerekçe
-Hasta, doktor ve sekreterin ortak bilgilerini (ad, e-posta, parola özeti, rol) users tablosunda topladık; hastaya ve doktora özel alanlar kendi tablolarında durur ve user_id yabancı anahtarıyla users tablosuna bağlanır; user_id benzersiz olduğundan bir kullanıcının en fazla bir hasta veya doktor profili olur. Böylece sınıf diyagramındaki kalıtım yapısı tabloya birebir yansır ve giriş ile yetki kontrolü (NFR1, NFR2) tek tablodan yürür. Boş randevu saatlerini tabloya yazmak yerine doktorun çalışma planından (schedules) ve izinlerinden (time_offs) hesaplıyoruz; bu, plan değiştiğinde (FR18) eski slot kayıtlarını güncelleme zorunluluğunu ortadan kaldırır. Randevu ve bekleme kaydı, hasta ile doktor arasındaki N-M ilişkiyi kuran ara tablolardır. Tüm tablolar 3NF'dir; hiçbir bilgi birden fazla yerde tekrar edilmediği için güncelleme tutarsızlığı oluşmaz.
+Hasta, doktor ve sekreterin ortak bilgilerini (ad, e-posta, parola özeti, rol) users tablosunda topladık; hastaya ve doktora özel alanlar kendi tablolarında durur ve user_id yabancı anahtarıyla users tablosuna bağlanır; user_id benzersiz olduğundan bir kullanıcının en fazla bir hasta veya doktor profili olur. Böylece sınıf diyagramındaki kalıtım yapısı tabloya birebir yansır ve giriş ile yetki kontrolü (NFR1, NFR2) tek tablodan yürür. Boş randevu saatlerini tabloya yazmak yerine doktorun çalışma planından (schedules) ve izinlerinden (time_offs) hesaplıyoruz.Randevu ve bekleme kaydı, hasta ile doktor arasındaki N-M ilişkiyi kuran ara tablolardır. Tüm tablolar 3NF'dir; hiçbir bilgi birden fazla yerde tekrar edilmediği için güncelleme tutarsızlığı oluşmaz.
 
 
 
