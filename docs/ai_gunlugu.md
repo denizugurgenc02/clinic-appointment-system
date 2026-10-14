@@ -53,4 +53,29 @@ Her kayıtta tarih, amaç, istem (özet), sonuç, değiştirilen/reddedilen kıs
 - **Yapay zekânın yanıldığı / yakalanan durum:** Yapay zekâ ilk etapta yalnızca Issue'daki aktör ve entity sınıflarına odaklanarak mimarinin Controller ve somut Repository parçalarını dışarıda bıraktı. Yapılan sorgulama ile bu eksiklik yakalandı ve mimari katmanlar tamamlandı.
 
 
+---
+
+### Kayıt 8 — Sıralama Diyagramı: Çekirdek akış ve katmanlı mimarinin kurulması
+
+- **Tarih:** [14.10.2026]
+- **Amaç:** Çekirdek problem olan eşzamanlı çakışmayı (double-booking) ve randevu alma akışını katmanlı mimariye uygun olarak sıralama diyagramına aktarmak.
+- **Kullanılan istem (özet):** Soldan sağa katmanları (Tarayıcı, Controller, Service, Repository) içeren, SQL barındırmayan ve hata dalı içeren bir Mermaid sequence diyagramı istendi.
+- **Sonuç:** Yapay zekâ, `POST /randevu/al` çağrısı üzerinden transaction başlatan ve çakışma kontrolü yapan bir sıralama diyagramı oluşturdu.
+- **Kabul edilen / reddedilen kısım:** Kısmen kabul edildi; geliştirilmek üzere revize istendi.
+- **Neden:** Issue'da yer alan "hasta filtreler -> slot seçer" adımı eksikti; doğrudan randevu kaydı yerine öncesinde slotların listelenmesi gerektiği tespit edildi.
+- **Yapay zekânın yanıldığı / yakalanan durum:** İlk taslakta akış doğrudan kayıt işleminden başlıyordu, issue kriterindeki filtreleme ve slot listeleme adımı atlanmıştı.
+
+---
+
+### Kayıt 9 — Sıralama Diyagramı: Uçtan uca veri akışı ve karar bloklarının düzenlenmesi
+
+- **Tarih:** [14.10.2026]
+- **Amaç:** Slot listeleme adımında Repository katmanına erişilmesini sağlamak ve `alt...else` karar bloğunda pozitif akışı başa almak.
+- **Kullanılan istem (özet):** Slotların Service tarafından doğrudan üretilemeyeceği, takvim verisi için Repository'ye gidilmesi gerektiği belirtildi. Ayrıca `alt` bloğunda ilk durumun "slot müsait", `else` durumunun "slot müsait değil" olması istendi.
+- **Sonuç:** Diyagram uçtan uca güncellendi; `GET /slotlar` isteği sonrasında Service'in Repository'den doktor takvimi ve mevcut randevuları çekip slot hesapladığı gösterildi. `alt` bloğu ilk durumu başarılı kayıt, `else` durumu ise çakışma/reddedilme (409 Conflict) olacak şekilde düzenlendi.
+- **Kabul edilen / reddedilen kısım:** Kabul edildi.
+- **Neden:** Katman atlama ve sahte veri üretme hatası giderildi, issue kriterindeki "uçtan uca akış" ve karar dalı kuralları tam sağlandı.
+- **Yapay zekânın yanıldığı / yakalanan durum:** Yapay zekâ slot listeleme isteğinde Repository adımını atlayıp Service üzerinden doğrudan veri dönmüştü; mimari sorgulama ile düzeltildi.
+
+
 

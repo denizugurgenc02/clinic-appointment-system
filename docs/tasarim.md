@@ -261,7 +261,43 @@ classDiagram
 
 ## 3. Sıralama diyagramı
 
-_Bu bölüm yazılacak: randevu alma akışı ve hata dalı._
+```mermaid
+sequenceDiagram
+    autonumber
+    actor T as Tarayıcı
+    participant C as AppointmentController
+    participant S as AppointmentService
+    participant R as AppointmentRepository
+
+    %% 1. Filtreleme ve Slotların Veritabanından Getirilmesi
+    T->>C: GET /slotlar?doctorId=5&date=2026-10-20
+    C->>S: getAvailableSlots(doctorId, date)
+    S->>R: findDoctorScheduleAndBookings(doctorId, date)
+    R-->>S: takvimVeMevcutRandevular[]
+    S->>S: boş slotları hesapla (DateTime / DatePeriod)
+    S-->>C: bosSlotlar[]
+    C-->>T: 200 OK (Slot ızgarası listelenir)
+
+    %% 2. Randevu Seçimi, Doğrulama ve Transaction
+    T->>C: POST /randevu/al (doctorId, date, time)
+    C->>S: bookAppointment(patientId, doctorId, date, time)
+    
+    S->>S: transaction başlat
+    S->>R: findOverlapping(doctorId, date, time)
+    R-->>S: mevcutRandevu (null veya Appointment)
+
+    %% 3. Karar Bloğu: İlk durum müsaitlik, else durumu müsait olmama
+    alt slot müsait (çakışma yok - başarılı durum)
+        S->>R: save(yeniRandevu)
+        R-->>S: true (kaydedildi)
+        S->>S: transaction commit
+        S-->>C: Appointment objesi
+        C-->>T: 200 OK / "Randevu başarıyla oluşturuldu"
+    else slot müsait değil (eşzamanlı çakışma - hata durumu)
+        S->>S: transaction rollback
+        S-->>C: SlotAlreadyBookedException
+        C-->>T: 409 Conflict / "Seçilen saat dolmuştur, reddedildi"
+    end
 
 ## 4. ER diyagramı
 
