@@ -15,7 +15,136 @@ _Bu bölüm yazılacak: katman şeması ve klasör yapısı._
 
 ## 2. Sınıf diyagramı
 
-_Bu bölüm yazılacak: Mermaid ile en az 12 sınıf._
+```mermaid
+classDiagram
+    %% --- Kalıtım Hiyerarşisi (Kullanıcılar) ---
+    class User {
+        +int id
+        +string name
+        +string email
+        +string passwordHash
+        +string role
+        +login(string email, string pass) bool
+        +changePassword(string newPass) bool
+    }
+
+    class Patient {
+        +string phone
+        +viewMyAppointments() array
+        +bookAppointment(Slot slot) bool
+    }
+
+    class Doctor {
+        +int polyclinicId
+        +string title
+        +setSchedule(Schedule s) void
+        +addTimeOff(TimeOff t) void
+    }
+
+    class Secretary {
+        +manageAppointments() void
+        +generateDailyReport(string date) array
+    }
+
+    %% Kalıtım (Inheritance)
+    User <|-- Patient
+    User <|-- Doctor
+    User <|-- Secretary
+
+    %% --- Alan Varlıkları (Domain Entities) ---
+    class Polyclinic {
+        +int id
+        +string name
+        +string description
+    }
+
+    class Schedule {
+        +int id
+        +int doctorId
+        +int dayOfWeek
+        +string startTime
+        +string endTime
+        +int slotDuration
+    }
+
+    class TimeOff {
+        +int id
+        +int doctorId
+        +string startDate
+        +string endDate
+        +string reason
+    }
+
+    class Slot {
+        +string date
+        +string startTime
+        +string endTime
+        +bool isAvailable
+    }
+
+    class Appointment {
+        +int id
+        +int patientId
+        +int doctorId
+        +string date
+        +string startTime
+        +string status
+        +cancel() void
+    }
+
+    class WaitingListEntry {
+        +int id
+        +int patientId
+        +int doctorId
+        +string preferredDate
+        +string offerExpiresAt
+        +string status
+        +isExpired() bool
+    }
+
+    %% --- Repository Arayüzü ---
+    class AppointmentRepositoryInterface {
+        <<interface>>
+        +save(Appointment a) bool
+        +findById(int id) Appointment
+        +findOverlapping(int doctorId, string date, string time) Appointment
+        +updateStatus(int id, string status) bool
+    }
+
+    %% --- Servis Katmanı (İş Mantığı) ---
+    class SlotService {
+        +generateSlots(int doctorId, string date) array
+        -isTimeOff(int doctorId, string date) bool
+    }
+
+    class WaitlistService {
+        +offerNextPatient(int doctorId, string date) void
+        +handleOfferResponse(int waitlistId, bool accepted) bool
+    }
+
+    class AppointmentService {
+        -AppointmentRepositoryInterface repo
+        +bookAppointment(int patientId, int doctorId, string date, string time) Appointment
+        +cancelAppointment(int appointmentId) bool
+    }
+
+    %% --- İlişkiler ve Kardinaliteler ---
+    Polyclinic "1" --> "*" Doctor : calistirir
+    Doctor "1" *-- "1..*" Schedule : icerir
+    Doctor "1" *-- "*" TimeOff : izin_alir
+    Doctor "1" --> "*" Slot : uretir
+    
+    Patient "1" --> "*" Appointment : randevu_alir
+    Doctor "1" --> "*" Appointment : muayene_eder
+    
+    Doctor "1" --> "*" WaitingListEntry : bekleyenler
+    Patient "1" --> "*" WaitingListEntry : siraya_girer
+
+    AppointmentService --> AppointmentRepositoryInterface : kullanir
+    AppointmentService ..> Appointment : olusturur
+    AppointmentService ..> WaitlistService : tetikler
+    SlotService ..> Schedule : okur
+```
 
 ## 3. Sıralama diyagramı
 
