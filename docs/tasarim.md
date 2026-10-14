@@ -15,35 +15,59 @@ _Bu bölüm yazılacak: katman şeması ve klasör yapısı._
 
 ## 2. Sınıf diyagramı
 
+## 2. Sınıf Diyagramı (Class Diagram)
+
 ```mermaid
 classDiagram
-    %% --- Kalıtım Hiyerarşisi (Kullanıcılar) ---
+    %% ==========================================
+    %% 1. ENUM'LAR (PHP 8.1 Standartı)
+    %% ==========================================
+    class UserRole {
+        <<enumeration>>
+        PATIENT
+        DOCTOR
+        SECRETARY
+    }
+
+    class AppointmentStatus {
+        <<enumeration>>
+        SCHEDULED
+        COMPLETED
+        CANCELLED
+    }
+
+    class WaitlistStatus {
+        <<enumeration>>
+        PENDING
+        OFFERED
+        ACCEPTED
+        EXPIRED
+    }
+
+    %% ==========================================
+    %% 2. MODEL / VARLIK KATMANI VE KALITIM
+    %% ==========================================
     class User {
         +int id
         +string name
         +string email
         +string passwordHash
-        +string role
-        +login(string email, string pass) bool
-        +changePassword(string newPass) bool
+        +UserRole role
+        +login(string email, string password) bool
+        +changePassword(string newPassword) bool
     }
 
     class Patient {
         +string phone
-        +viewMyAppointments() array
-        +bookAppointment(Slot slot) bool
     }
 
     class Doctor {
-        +int polyclinicId
+        +int departmentId
         +string title
-        +setSchedule(Schedule s) void
-        +addTimeOff(TimeOff t) void
     }
 
     class Secretary {
-        +manageAppointments() void
-        +generateDailyReport(string date) array
+        +string employeeNumber
     }
 
     %% Kalıtım (Inheritance)
@@ -51,11 +75,9 @@ classDiagram
     User <|-- Doctor
     User <|-- Secretary
 
-    %% --- Alan Varlıkları (Domain Entities) ---
-    class Polyclinic {
+    class Department {
         +int id
         +string name
-        +string description
     }
 
     class Schedule {
@@ -64,7 +86,9 @@ classDiagram
         +int dayOfWeek
         +string startTime
         +string endTime
-        +int slotDuration
+        +string lunchBreakStart
+        +string lunchBreakEnd
+        +int slotDurationMinutes
     }
 
     class TimeOff {
@@ -88,62 +112,151 @@ classDiagram
         +int doctorId
         +string date
         +string startTime
-        +string status
+        +AppointmentStatus status
         +cancel() void
     }
 
-    class WaitingListEntry {
+    class Waitlist {
         +int id
         +int patientId
         +int doctorId
         +string preferredDate
         +string offerExpiresAt
-        +string status
+        +WaitlistStatus status
         +isExpired() bool
     }
 
-    %% --- Repository Arayüzü ---
+    %% ==========================================
+    %% 3. OBSERVER KALIBI (İptal & Bekleme Listesi)
+    %% ==========================================
+    class AppointmentCancelObserverInterface {
+        <<interface>>
+        +onAppointmentCancelled(Appointment appointment) void
+    }
+
+    class WaitlistObserver {
+        -WaitlistService waitlistService
+        +onAppointmentCancelled(Appointment appointment) void
+    }
+
+    WaitlistObserver ..|> AppointmentCancelObserverInterface
+
+    %% ==========================================
+    %% 4. REPOSITORY KATMANI (Arayüz & Gerçekleme)
+    %% ==========================================
     class AppointmentRepositoryInterface {
         <<interface>>
         +save(Appointment a) bool
         +findById(int id) Appointment
         +findOverlapping(int doctorId, string date, string time) Appointment
-        +updateStatus(int id, string status) bool
+        +updateStatus(int id, AppointmentStatus status) bool
+        +getDailyList(int doctorId, string date) array
     }
 
-    %% --- Servis Katmanı (İş Mantığı) ---
+    class MysqlAppointmentRepository {
+        -PDO pdo
+        +save(Appointment a) bool
+        +findById(int id) Appointment
+        +findOverlapping(int doctorId, string date, string time) Appointment
+        +updateStatus(int id, AppointmentStatus status) bool
+        +getDailyList(int doctorId, string date) array
+    }
+
+    class WaitlistRepositoryInterface {
+        <<interface>>
+        +getNextInQueue(int doctorId, string date) Waitlist
+        +updateOfferStatus(int id, WaitlistStatus status, string expiresAt) bool
+    }
+
+    class MysqlWaitlistRepository {
+        -PDO pdo
+        +getNextInQueue(int doctorId, string date) Waitlist
+        +updateOfferStatus(int id, WaitlistStatus status, string expiresAt) bool
+    }
+
+    class ScheduleRepositoryInterface {
+        <<interface>>
+        +findByDoctor(int doctorId) array
+        +findTimeOffs(int doctorId, string date) array
+    }
+
+    class MysqlScheduleRepository {
+        -PDO pdo
+        +findByDoctor(int doctorId) array
+        +findTimeOffs(int doctorId, string date) array
+    }
+
+    MysqlAppointmentRepository ..|> AppointmentRepositoryInterface
+    MysqlWaitlistRepository ..|> WaitlistRepositoryInterface
+    MysqlScheduleRepository ..|> ScheduleRepositoryInterface
+
+    %% ==========================================
+    %% 5. SERVİS KATMANI (İş Mantığı & Transaction)
+    %% ==========================================
     class SlotService {
+        -ScheduleRepositoryInterface scheduleRepo
+        -AppointmentRepositoryInterface appointmentRepo
         +generateSlots(int doctorId, string date) array
-        -isTimeOff(int doctorId, string date) bool
+        -isLunchBreak(Schedule s, string time) bool
     }
 
     class WaitlistService {
+        -WaitlistRepositoryInterface waitlistRepo
         +offerNextPatient(int doctorId, string date) void
-        +handleOfferResponse(int waitlistId, bool accepted) bool
+        +handleOfferResponse(int waitlistId, bool isAccepted) bool
     }
 
     class AppointmentService {
-        -AppointmentRepositoryInterface repo
+        -AppointmentRepositoryInterface appointmentRepo
+        -array observers
         +bookAppointment(int patientId, int doctorId, string date, string time) Appointment
         +cancelAppointment(int appointmentId) bool
+        +attachObserver(AppointmentCancelObserverInterface obs) void
+        -notifyObservers(Appointment a) void
     }
 
-    %% --- İlişkiler ve Kardinaliteler ---
-    Polyclinic "1" --> "*" Doctor : calistirir
-    Doctor "1" *-- "1..*" Schedule : icerir
-    Doctor "1" *-- "*" TimeOff : izin_alir
-    Doctor "1" --> "*" Slot : uretir
-    
-    Patient "1" --> "*" Appointment : randevu_alir
-    Doctor "1" --> "*" Appointment : muayene_eder
-    
-    Doctor "1" --> "*" WaitingListEntry : bekleyenler
-    Patient "1" --> "*" WaitingListEntry : siraya_girer
+    AppointmentService --> AppointmentRepositoryInterface : kullanır
+    AppointmentService --> AppointmentCancelObserverInterface : bildirir
+    WaitlistService --> WaitlistRepositoryInterface : kullanır
+    WaitlistObserver --> WaitlistService : tetikler
+    SlotService --> ScheduleRepositoryInterface : kullanır
+    SlotService --> AppointmentRepositoryInterface : kullanır
 
-    AppointmentService --> AppointmentRepositoryInterface : kullanir
-    AppointmentService ..> Appointment : olusturur
-    AppointmentService ..> WaitlistService : tetikler
-    SlotService ..> Schedule : okur
+    %% ==========================================
+    %% 6. CONTROLLER KATMANI (İstek Karşılama)
+    %% ==========================================
+    class AppointmentController {
+        -AppointmentService appointmentService
+        -SlotService slotService
+        +getAvailableSlots() void
+        +store() void
+        +cancel() void
+    }
+
+    class SecretaryController {
+        -AppointmentService appointmentService
+        -AppointmentRepositoryInterface appointmentRepo
+        +getDailyReport() void
+        +manageWaitlist() void
+    }
+
+    AppointmentController ..> AppointmentService : bağımlıdır
+    AppointmentController ..> SlotService : bağımlıdır
+    SecretaryController ..> AppointmentService : bağımlıdır
+
+    %% ==========================================
+    %% 7. KARDİNALİTE VE DOMAİN İLİŞKİLERİ (1-N vb.)
+    %% ==========================================
+    Department "1" --> "0..*" Doctor : barındırır
+    Doctor "1" *-- "1..*" Schedule : mesai_takvimi
+    Doctor "1" *-- "0..*" TimeOff : izinleri
+    Doctor "1" --> "0..*" Slot : üretir
+    
+    Patient "1" --> "0..*" Appointment : randevusu_vardır
+    Doctor "1" --> "0..*" Appointment : hastası_vardır
+    
+    Doctor "1" --> "0..*" Waitlist : bekleyenler
+    Patient "1" --> "0..*" Waitlist : sıradadır
 ```
 
 ## 3. Sıralama diyagramı
