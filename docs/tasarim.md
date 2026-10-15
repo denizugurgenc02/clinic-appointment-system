@@ -799,7 +799,7 @@ $container->bind(AppointmentService::class, function($c) {
 
 ## 6. Arayüz
 
-_Bu bölüm yazılacak: sayfa haritası ve en az 5 ekran taslağı._
+ Ekran UI ları gösterilecek.
 
 ## 7. Riskler
 
@@ -817,5 +817,5 @@ _Bu bölüm yazılacak: sayfa haritası ve en az 5 ekran taslağı._
 
 ## 8. Plan
 
-- Proje panosu (backlog): _pano bağlantısı eklenecek_
+- Proje panosu (backlog):https://github.com/users/denizugurgenc02/projects/2
 - Kilometre taşları: Sunum 1 - 15.10.2026, Sunum 2 - 22.10.2026, Sunum 3 - 29.10.2026
