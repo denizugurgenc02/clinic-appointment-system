@@ -4,10 +4,9 @@
 
 | Bölüm | Anlatan |
 | --- | --- |
-| Proje, çekirdek problem, roller | (isim) |
-| 1. Mimari, 2. Sınıf diyagramı, 5. Tasarım desenleri | (isim) |
-| 3. Sıralama diyagramı, 4. ER diyagramı | (isim) |
-| 6. Arayüz, 7. Riskler, 8. Plan | (isim) |
+| Proje, çekirdek problem, roller ,mimari, 4. ER diyagramı , 7. Riskler, 8. Plan  | Hatice |
+| 2. Sınıf diyagramı, 5. Tasarım desenleri,3. Sıralama diyagramı, 6. Arayüz,  | Efe |
+
 
 ## 1. Mimari
 
