@@ -9,5 +9,7 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-development}
       APP_DEBUG: ${APP_DEBUG:-0}
+      # Boşsa config/app.php içindeki varsayılan (asdf1234) kullanılır
+      SUPER_ADMIN_PASSWORD_HASH: ${SUPER_ADMIN_PASSWORD_HASH:-}
 
 # Aşama 3'te MySQL servisi (db) buraya eklenecek. Aşama 2'de veri storage/data/*.json dosyalarındadır.
