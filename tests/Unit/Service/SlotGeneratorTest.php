@@ -72,11 +72,14 @@ final class SlotGeneratorTest extends TestCase
 
     public function testSlotNeverCrossesTheEndOfAWorkingBlock(): void
     {
-        // 45 dk'lık slotlar: 09:00, 09:45, 10:30, 11:15 -> 12:00. 12:00'de başlayan slot üretilmez.
-        $slots = $this->generator->generate($this->mondayWithLunchBreak(), [], [], $this->day(self::MONDAY), 1, 45, $this->now);
+        // Sınır durumu: 3 saatlik satır 40 dk'ya tam bölünmez.
+        // 09:00, 09:40, 10:20, 11:00 sığar; 11:40 başlayan slot 12:20'de biterdi -> üretilmemeli.
+        // (İlk sürümde 45 dk kullanılmıştı; 180/45 tam bölündüğü için kural bozulunca test kırılmıyordu.)
+        $slots = $this->generator->generate($this->mondayWithLunchBreak(), [], [], $this->day(self::MONDAY), 1, 40, $this->now);
         $morning = array_values(array_filter($slots, static fn (Slot $s): bool => $s->start->format('H') < '12'));
 
-        self::assertSame(['09:00', '09:45', '10:30', '11:15'], self::times($morning));
+        self::assertSame(['09:00', '09:40', '10:20', '11:00'], self::times($morning));
+        self::assertNotContains('11:40', self::times($slots), 'Öğle arasına taşan slot üretilmemeli');
         foreach ($slots as $slot) {
             self::assertFalse(
                 $slot->start < $this->day(self::MONDAY . ' 12:00') && $slot->end > $this->day(self::MONDAY . ' 12:00'),
