@@ -19,7 +19,8 @@ final class Session
             return;
         }
 
-        if (headers_sent()) {
+        // Komut satırında (testler, bin/ betikleri) çerez yok; dizi olarak çalış
+        if (PHP_SAPI === 'cli' || headers_sent()) {
             $_SESSION ??= [];
 
             return;

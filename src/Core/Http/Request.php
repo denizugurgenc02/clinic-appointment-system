@@ -104,6 +104,11 @@ final class Request
         return $file;
     }
 
+    public function uploadedFile(string $key): UploadedFile
+    {
+        return UploadedFile::fromArray($this->file($key) ?? []);
+    }
+
     public function header(string $name): ?string
     {
         return $this->headers[strtolower($name)] ?? null;

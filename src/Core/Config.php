@@ -45,6 +45,16 @@ final class Config
         return is_numeric($value) ? (int) $value : $default;
     }
 
+    /**
+     * @return array<mixed>
+     */
+    public function array(string $key): array
+    {
+        $value = $this->get($key, []);
+
+        return is_array($value) ? $value : [];
+    }
+
     public function bool(string $key, bool $default = false): bool
     {
         $value = $this->get($key, $default);

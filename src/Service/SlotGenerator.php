@@ -57,6 +57,7 @@ final class SlotGenerator
 
         $slots = [];
 
+        /** @var DateTimeImmutable $day DatePeriod, başlangıç türünü (Immutable) korur */
         foreach ($dayPeriod as $day) {
             foreach ($this->rowsFor($schedules, (int) $day->format('N')) as $row) {
                 $blockStart = $row->startOn($day);

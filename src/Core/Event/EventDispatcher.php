@@ -4,19 +4,25 @@ declare(strict_types=1);
 
 namespace App\Core\Event;
 
+use Closure;
+
 /**
  * Observer deseninde "özne" (subject). Olayı yayınlayan servis, dinleyicileri
  * tanımaz; yalnızca dispatch() çağırır. Dinleyiciler config/events.php içinde kaydedilir.
+ *
+ * Dinleyici hazır nesne olarak ya da fabrika (Closure) olarak verilebilir; fabrika
+ * olay ilk yayınlandığında çalışır, böylece her istekte tüm servis zinciri kurulmaz.
  */
 final class EventDispatcher
 {
-    /** @var array<class-string, list<EventListenerInterface>> */
+    /** @var array<class-string, list<EventListenerInterface|Closure(): EventListenerInterface>> */
     private array $listeners = [];
 
     /**
-     * @param class-string $eventClass
+     * @param class-string                                      $eventClass
+     * @param EventListenerInterface|Closure(): EventListenerInterface $listener
      */
-    public function listen(string $eventClass, EventListenerInterface $listener): void
+    public function listen(string $eventClass, EventListenerInterface|Closure $listener): void
     {
         $this->listeners[$eventClass][] = $listener;
     }
@@ -26,7 +32,7 @@ final class EventDispatcher
      */
     public function dispatch(object $event): void
     {
-        foreach ($this->listeners[$event::class] ?? [] as $listener) {
+        foreach ($this->listenersFor($event::class) as $listener) {
             $listener->handle($event);
         }
     }
@@ -37,6 +43,16 @@ final class EventDispatcher
      */
     public function listenersFor(string $eventClass): array
     {
-        return $this->listeners[$eventClass] ?? [];
+        $resolved = [];
+        foreach ($this->listeners[$eventClass] ?? [] as $listener) {
+            $resolved[] = $listener instanceof Closure ? $listener() : $listener;
+        }
+
+        // Üretilen nesneler saklanır; fabrika yalnızca bir kez çalışır
+        if ($resolved !== []) {
+            $this->listeners[$eventClass] = $resolved;
+        }
+
+        return $resolved;
     }
 }

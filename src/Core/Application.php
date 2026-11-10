@@ -34,8 +34,15 @@ final class Application
     private readonly Container $container;
     private readonly Router $router;
 
-    public function __construct(private readonly string $basePath)
-    {
+    /**
+     * @param array<string, mixed> $configOverrides Testlerde veri klasörü vb. değiştirmek için
+     * @param ClockInterface|null  $clock           Testlerde FrozenClock vermek için
+     */
+    public function __construct(
+        private readonly string $basePath,
+        private readonly array $configOverrides = [],
+        private readonly ?ClockInterface $clock = null,
+    ) {
         $this->container = new Container();
         $this->bootstrap();
         $this->router = $this->container->get(Router::class);
@@ -64,14 +71,16 @@ final class Application
 
     private function bootstrap(): void
     {
-        $config = new Config($this->requireArray('config/app.php'));
+        /** @var array<string, mixed> $items */
+        $items = array_replace_recursive($this->requireArray('config/app.php'), $this->configOverrides);
+        $config = new Config($items);
         $timezone = new DateTimeZone($config->string('timezone', 'Europe/Istanbul'));
         date_default_timezone_set($timezone->getName());
 
         $c = $this->container;
         $c->instance(Container::class, $c);
         $c->instance(Config::class, $config);
-        $c->instance(ClockInterface::class, new SystemClock($timezone));
+        $c->instance(ClockInterface::class, $this->clock ?? new SystemClock($timezone));
         $c->instance(Session::class, new Session());
         $c->instance(View::class, new View($this->path('views')));
         $c->singleton(Csrf::class, static fn (Container $c): Csrf => new Csrf($c->get(Session::class)));
@@ -98,7 +107,8 @@ final class Application
                 if (!is_string($listenerClass) || !is_subclass_of($listenerClass, EventListenerInterface::class)) {
                     throw new UnexpectedValueException(sprintf('%s bir EventListenerInterface değil.', var_export($listenerClass, true)));
                 }
-                $dispatcher->listen($event, $this->container->get($listenerClass));
+                $container = $this->container;
+                $dispatcher->listen($event, static fn (): EventListenerInterface => $container->get($listenerClass));
             }
         }
     }
@@ -127,7 +137,7 @@ final class Application
         $view->share('flashes', $session->pullFlashes());
         $view->share('old', $session->pullOldInput());
         $view->share('csrfToken', $this->container->get(Csrf::class)->token());
-        $view->share('currentUser', null); // Faz 6'da AuthService ile doldurulacak
+        $view->share('currentUser', null); // ShareCurrentUser middleware'i doldurur
     }
 
     /**
