@@ -43,7 +43,7 @@ class HttpException extends RuntimeException
 
     public static function csrfMismatch(): self
     {
-        return new self(419, 'Oturum süreniz dolmuş veya form geçersiz. Lütfen sayfayı yenileyip tekrar deneyin.');
+        return new self(403, 'Oturum süreniz dolmuş veya form geçersiz. Lütfen sayfayı yenileyip tekrar deneyin.');
     }
 
     public function statusCode(): int

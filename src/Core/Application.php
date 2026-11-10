@@ -136,6 +136,7 @@ final class Application
         $view = $this->container->get(View::class);
         $view->share('flashes', $session->pullFlashes());
         $view->share('old', $session->pullOldInput());
+        $view->share('errors', $session->pullErrors());
         $view->share('csrfToken', $this->container->get(Csrf::class)->token());
         $view->share('currentUser', null); // ShareCurrentUser middleware'i doldurur
     }

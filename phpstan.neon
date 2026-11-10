@@ -5,6 +5,7 @@ parameters:
         - config
         - public
         - tests
+        - bin
     excludePaths:
         # Şablon fikstürleri extract() ile gelen değişkenleri kullanır
         - tests/Fixtures

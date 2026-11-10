@@ -12,6 +12,7 @@ final class Session
 {
     private const FLASH_KEY = '_flash';
     private const OLD_INPUT_KEY = '_old_input';
+    private const ERRORS_KEY = '_errors';
 
     public function start(): void
     {
@@ -77,13 +78,14 @@ final class Session
         }
     }
 
+    /**
+     * Çıkışta oturum verisini siler ve yeni bir oturum kimliği üretir.
+     * Oturum açık kaldığı için çıkış sonrası flash mesajı gösterilebilir.
+     */
     public function destroy(): void
     {
         $_SESSION = [];
-
-        if (session_status() === PHP_SESSION_ACTIVE) {
-            session_destroy();
-        }
+        $this->regenerate();
     }
 
     /**
@@ -118,6 +120,26 @@ final class Session
     {
         unset($input['_csrf'], $input['password'], $input['password_confirmation']);
         $_SESSION[self::OLD_INPUT_KEY] = $input;
+    }
+
+    /**
+     * Alan bazlı form hataları (alan => mesaj), bir sonraki istekte gösterilir.
+     *
+     * @param array<string, string> $errors
+     */
+    public function flashErrors(array $errors): void
+    {
+        $_SESSION[self::ERRORS_KEY] = $errors;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function pullErrors(): array
+    {
+        $errors = $this->pull(self::ERRORS_KEY, []);
+
+        return is_array($errors) ? array_filter($errors, 'is_string') : [];
     }
 
     /**

@@ -59,9 +59,9 @@ final class CsrfMiddlewareTest extends TestCase
                     new Request('POST', '/appointments', body: $body),
                     static fn (): Response => Response::html('ok'),
                 );
-                self::fail('419 bekleniyordu');
+                self::fail('403 bekleniyordu');
             } catch (HttpException $e) {
-                self::assertSame(419, $e->statusCode());
+                self::assertSame(403, $e->statusCode());
             }
         }
     }
