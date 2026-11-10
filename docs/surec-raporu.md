@@ -1,7 +1,7 @@
 # Aşama 2 Süreç Raporu — Klinik Randevu Sistemi
 
-> **Taslak.** `[EKİP DOLDURACAK]` ile işaretli bölümler, git geçmişinden çıkarılamayan bilgiler gerektirir:
-> haftalık iş dağılımı, eleştirmen grup geri bildirimi, issue/PR bağlantıları. Teslimden önce doldurulmalıdır.
+> Bu rapordaki iş dağılımı ve katkı bilgileri GitHub deposundaki commit, pull request ve issue kayıtlarından
+> (10.11.2026 itibarıyla) derlenmiştir.
 
 **Grup:** Hatice AYVAZ (2307231001), Mehmet Efe KAYA (2307231054), Eren ÇİT (2307231029), Deniz Uğur GENÇ (2307231030)
 **Depo:** https://github.com/denizugurgenc02/clinic-appointment-system · **Pano:** https://github.com/users/denizugurgenc02/projects/2
@@ -24,15 +24,34 @@ uygulamalarıyla okunur.
 
 ## 2. Aşama 2 boyunca yapılan işler
 
-`[EKİP DOLDURACAK]` Haftalara göre tablo. Git geçmişinden çıkarılabilenler:
+**Planlama.** Hatice Ayvaz, SRS'teki her fonksiyonel gereksinim için kabul kriterli bir GitHub issue'su açtı
+(#10–#27) ve işleri üyelere dağıttı:
 
-| Tarih | Kişi | İş (commit / PR) |
-| --- | --- | --- |
-| 07.10.2026 | Deniz Uğur Genç | Depo, `.gitignore`, proje isterleri, `CLAUDE.md` |
-| 08–15.10.2026 | Hatice Ayvaz | README, risk analizi (#8), ER diyagramı ve normalizasyon, SRS (#4), sunum dağılımı, plan (#9); PR #1, #28, #32–#34 |
-| 11–14.10.2026 | Mehmet Efe Kaya | Sınıf diyagramı (#3), sıralama diyagramı (#6); PR #29, #30 |
-| 12–14.10.2026 | Eren Çit | Klasör iskeleti, ilk `tasarim.md`, UI taslakları; PR #31 |
-| 10.11.2026 | Eren Çit (+ Claude Code) | Tasarımın netleştirilmesi, altyapı, model, slot algoritması, JSON veri katmanı, servisler, ekranlar, testler, süper yönetici, Phase-2 uyumu; dal `asama-2/prototip` |
+| Üye | Atanan gereksinimler (issue) |
+| --- | --- |
+| Hatice Ayvaz | FR1–FR5 (#10–#14) |
+| Deniz Uğur Genç | FR6–FR10 (#15–#19) |
+| Eren Çit | FR11–FR14 (#20–#23) |
+| Mehmet Efe Kaya | FR15–FR18 (#24–#27) |
+
+**Haftalara göre yapılan işler** (commit ve PR tarihlerine göre):
+
+| Hafta | Üye | Yapılan iş | Kayıt |
+| --- | --- | --- | --- |
+| 07–11.10.2026 | Deniz Uğur Genç | Depo, `.gitignore`, proje isterleri, `CLAUDE.md` | ilk commit'ler |
+| 07–11.10.2026 | Hatice Ayvaz | README; Aşama 1 görev issue'ları (#2–#9) | PR #1 |
+| 07–11.10.2026 | Mehmet Efe Kaya | README'ye ekip bilgisi | commit |
+| 12–15.10.2026 | Hatice Ayvaz | Risk analizi (#8), ER diyagramı ve normalizasyon (#4), SRS, sunum dağılımı, plan (#9); FR issue'ları (#10–#27) | PR #28, #32, #33, #34 |
+| 12–15.10.2026 | Mehmet Efe Kaya | Sınıf diyagramı (#3), sıralama diyagramı (#6) | PR #29, #30 |
+| 12–15.10.2026 | Eren Çit | Klasör iskeleti, ilk `tasarim.md`, UI taslakları (#7) | PR #31 |
+| 15.10.2026 | — | **Sunum 1** | |
+| 16.10–09.11.2026 | — | Depoda kayıtlı commit yok | |
+| 10.11.2026 | Eren Çit (Claude Code desteğiyle) | Tasarımın netleştirilmesi; altyapı, model, slot algoritması, JSON veri katmanı, servisler, ekranlar, 93 test; süper yönetici; Phase-2 uyumu; `docker compose up` ile tek adımda çalışma | 18 commit, PR #35 |
+
+Aşama 2 kodunun tamamı tek bir dalda (`asama-2/prototip`) ve tek bir PR'da (#35) toplandı. Diğer üyelere atanmış
+FR issue'larının (#10–#27) işlevleri bu PR'da karşılandı; issue'lar PR birleştiğinde kapatılacaktır.
+Karşılanmayanlar: #12 (FR3), #16 (FR7), #22 (FR13), #27 (FR18) ve #15'in (FR6) doktorun kendi takvimi kısmı
+(gerekçeler: `docs/izlenebilirlik.md`).
 
 ## 3. Tasarım ve uygulama kararları
 
@@ -82,14 +101,41 @@ Ayrıntılar: [`docs/ai-gunlugu.md`](ai-gunlugu.md).
 
 ## 7. Eleştirmen grup geri bildirimleri
 
-`[EKİP DOLDURACAK]` Eleştirmen grubun önerileri, kabul edilip uygulananlar (issue/PR bağlantılarıyla),
-katılmadığımız öneriler ve gerekçeleri.
+Bu rapor yazıldığında (10.11.2026) eleştirmen gruptan GitHub'da kayıtlı bir geri bildirim (issue, PR yorumu veya
+inceleme) bulunmamaktadır; depodaki 35 issue/PR'ın hiçbirinde yorum yoktur. Geri bildirim geldiğinde aşağıdaki
+tabloya işlenecek, her öneri için bir issue açılıp yanıt ve düzeltme ilgili PR'a bağlanacaktır.
+
+| # | Öneri (issue / yorum bağlantısı) | Kararımız | Gerekçe / düzeltme (PR bağlantısı) |
+| --- | --- | --- | --- |
+| — | Henüz geri bildirim alınmadı | — | — |
+
+**Grup içi inceleme:** Aşama 2 kodu PR #35 ile `master`'a, en az bir grup üyesinin incelemesi ve onayıyla
+birleştirilecektir. Aşama 1 PR'ları (#1, #28–#34) yorumsuz birleştirilmişti. Hocanın beklentisine uygun olarak incelemede
+bulunan sorunların PR yorumu olarak somut biçimde yazılması gerekir.
 
 ## 8. Grup üyelerinin katkıları
 
-`[EKİP DOLDURACAK]` §2'deki git geçmişine ve PR'lara dayanarak. Aşama 2 kodunun büyük bölümü
-`asama-2/prototip` dalında tek kişi tarafından (AI desteğiyle) yazıldı. Her üyenin kendi bölümünü savunabilmesi
-ve sonraki işlerin üyelere dağıtılması gerekir.
+Commit sayıları birleştirme (merge) commit'leri hariçtir.
+
+| Üye | Commit | Açtığı PR | Açtığı issue | Katkı |
+| --- | --- | --- | --- | --- |
+| Hatice Ayvaz | 6 (+5 birleştirme) | #1, #28, #32, #33, #34 | #2–#27 (26 issue) | Proje planı ve FR issue'ları; SRS; ER diyagramı ve 3NF; risk analizi; plan ve pano; sunum dağılımı |
+| Mehmet Efe Kaya | 6 (+1 birleştirme) | #29, #30 | — | Sınıf diyagramı, sıralama diyagramı (AI günlüğü #002, #003) |
+| Deniz Uğur Genç | 6 | — | — | Deponun kurulumu, `.gitignore`, ödev isterleri, `CLAUDE.md` (AI çalışma kuralları) |
+| Eren Çit | 22 (+2 birleştirme) | #31, #35 | — | Aşama 1: iskelet ve UI taslakları. Aşama 2: prototipin tamamı (18 commit, PR #35), AI günlüğü #004 |
+
+**Değerlendirme:** Aşama 2'de kod katkısı tek üyede yoğunlaşmıştır; §2'deki planlanan iş dağılımı uygulamaya
+geçmemiştir. Sunumda her üyenin kodu savunabilmesi için, issue atamalarına (§2) yakın şu dağılım **önerilmektedir**
+(ekip tarafından onaylanmalıdır):
+
+| Üye | İnceleyip savunacağı bölüm (öneri) |
+| --- | --- |
+| Hatice Ayvaz | Randevu alma/iptal ve FR4 kuralı (`AppointmentService`), izlenebilirlik tablosu |
+| Deniz Uğur Genç | Slot üretimi (`SlotGenerator`), eşzamanlılık ve `FileLockTransactionManager` |
+| Eren Çit | Altyapı (Router, Container, middleware), JSON veri katmanı, süper yönetici |
+| Mehmet Efe Kaya | Bekleme listesi ve Observer (`WaitlistService`, `WaitlistListener`), sekreter/doktor ekranları, rapor |
+
+Aşama 3'teki MySQL repository'lerinin de bu dağılıma göre üyeler tarafından kendi dallarında yazılması önerilir.
 
 ## 9. Aşama 3: MySQL'e geçiş
 
