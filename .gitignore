@@ -9,11 +9,11 @@
 /.phpunit.cache/
 /coverage/
 
-# Runtime data
+# Runtime data (JSON veri dosyaları, loglar, yüklenen fotoğraflar)
+/storage/data/*
 /storage/logs/*
-/storage/cache/*
-/public/uploads/*
-!.gitkeep
+/storage/uploads/*
+!/storage/**/.gitkeep
 
 # IDE
 .idea/

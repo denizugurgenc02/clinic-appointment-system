@@ -3,7 +3,7 @@
 Bu dosya, bu depoda çalışan Claude Code (ve ekipteki diğer AI araçları) için proje bağlamını ve kuralları tanımlar.
 Kaynak belgeler: `docs/proje_description.docx`, `docs/proje_requirements.docx`, `docs/proje_suggestion.docx` (hocanın isterleri).
 
-> Durum: **İlk taslak (init).** Proje henüz iskelet aşamasında; bu dosya ilerledikçe genişletilecek.
+> Durum: **Aşama 2 — Faz 0 (tasarım) ve Faz 1 (altyapı) tamamlandı.** Güncel tasarım ve kararlar: `docs/tasarim.md`. Aşama 2'de veritabanı bağlantısı **yok**; veriler `storage/data/*.json`.
 
 ## Proje Özeti
 
@@ -58,11 +58,10 @@ SMS, e-posta, ödeme ve tıbbi kayıt **yoktur**. Bunlar için kod yazma.
 
 Proje **dockerize** çalışacak; yerelde WAMP/XAMPP/Laragon kurulumu gerekmez.
 
-Planlanan servisler (dosyalar henüz oluşturulmadı):
+Servisler:
 
-- `app` — PHP 8.2+ (Apache veya Nginx + PHP-FPM), Composer içerir. **DocumentRoot = `public/`** (tarayıcıdan yalnızca `public/` erişilebilir olmalı).
-- `db` — MySQL 8 / MariaDB; migration ve seed betikleri `database/` altından çalıştırılır.
-- (Opsiyonel) `phpmyadmin`.
+- `app` — `php:8.2-apache` + Composer, `mod_rewrite`. **DocumentRoot = `public/`** (tarayıcıdan yalnızca `public/` erişilebilir). Port `APP_PORT` (varsayılan 8000).
+- `db` — **Aşama 3'te eklenecek** (MySQL 8); migration ve seed betikleri `database/` altından çalıştırılır.
 
 Kurallar:
 
@@ -143,11 +142,12 @@ Docker dosyaları (`Dockerfile`, `docker-compose.yml`, `docker/`) kök dizinde y
 
 ## Komutlar
 
-> Docker ve Composer kurulumu yapıldığında doldurulacak.
-
 ```bash
-# docker compose up -d
-# docker compose exec app composer install
-# docker compose exec app vendor/bin/phpunit
-# docker compose exec app vendor/bin/phpstan analyse
+cp .env.example .env
+docker compose up -d --build
+docker compose exec app composer install
+docker compose exec app composer test      # PHPUnit
+docker compose exec app composer analyse   # PHPStan seviye 8 (hatasız olmalı)
 ```
+
+Windows Git Bash'te komutların başına `MSYS_NO_PATHCONV=1` eklenir.

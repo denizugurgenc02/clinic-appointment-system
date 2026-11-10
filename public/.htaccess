@@ -1,4 +1,8 @@
+Options -Indexes
+
 RewriteEngine On
+# Var olan dosyalar (css, js, görseller) doğrudan sunulur
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
+# Diğer tüm istekler front controller'a
 RewriteRule ^ index.php [QSA,L]

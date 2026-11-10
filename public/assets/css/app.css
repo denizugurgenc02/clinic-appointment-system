@@ -1,0 +1,10 @@
+/* Uygulamaya özel stiller. 375 px genişlikte yatay kaydırma olmamalı. */
+html,
+body {
+    overflow-x: hidden;
+}
+
+pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+}

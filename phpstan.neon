@@ -1,0 +1,10 @@
+parameters:
+    level: 8
+    paths:
+        - src
+        - config
+        - public
+        - tests
+    excludePaths:
+        # Şablon fikstürleri extract() ile gelen değişkenleri kullanır
+        - tests/Fixtures
