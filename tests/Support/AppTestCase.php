@@ -6,15 +6,32 @@ namespace Tests\Support;
 
 use App\Core\Application;
 use App\Core\Clock\FrozenClock;
+use App\Core\Config;
 use App\Core\Container;
 use App\Model\Department;
 use App\Model\Doctor;
 use App\Model\Patient;
 use App\Model\Schedule;
+use App\Repository\BuiltIn\SuperAdminUserRepository;
+use App\Repository\Contract\AppointmentRepositoryInterface;
 use App\Repository\Contract\DepartmentRepositoryInterface;
 use App\Repository\Contract\DoctorRepositoryInterface;
 use App\Repository\Contract\PatientRepositoryInterface;
 use App\Repository\Contract\ScheduleRepositoryInterface;
+use App\Repository\Contract\TimeOffRepositoryInterface;
+use App\Repository\Contract\TransactionManagerInterface;
+use App\Repository\Contract\UserRepositoryInterface;
+use App\Repository\Contract\WaitlistRepositoryInterface;
+use Tests\Support\InMemory\InMemoryAppointmentRepository;
+use Tests\Support\InMemory\InMemoryDatabase;
+use Tests\Support\InMemory\InMemoryDepartmentRepository;
+use Tests\Support\InMemory\InMemoryDoctorRepository;
+use Tests\Support\InMemory\InMemoryPatientRepository;
+use Tests\Support\InMemory\InMemoryScheduleRepository;
+use Tests\Support\InMemory\InMemoryTimeOffRepository;
+use Tests\Support\InMemory\InMemoryTransactionManager;
+use Tests\Support\InMemory\InMemoryUserRepository;
+use Tests\Support\InMemory\InMemoryWaitlistRepository;
 use DateTimeImmutable;
 use FilesystemIterator;
 use PHPUnit\Framework\TestCase;
@@ -22,8 +39,15 @@ use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 
 /**
- * Servis testleri için gerçek uygulama kurulumu (config/services.php + config/events.php),
- * ama her test için boş bir geçici JSON veri klasörü ve sabitlenmiş saat ile.
+ * Servis testleri için gerçek uygulama kurulumu (config/services.php + config/events.php,
+ * gerçek router/middleware/servisler), sabitlenmiş saat ile.
+ *
+ * Veri katmanı varsayılan olarak BELLEK İÇİ sahte repository'lerdir (tests/Support/InMemory):
+ * testler dosyaya dokunmaz ve hızlıdır. Ayrı PHP süreçlerinin aynı veriyi görmesi gereken testler
+ * (eşzamanlılık) useJsonStorage() ile gerçek JSON repository'lerini geçici bir klasörde kullanır.
+ *
+ * Aynı servis kodunun iki farklı veri katmanıyla çalışması, Aşama 3'teki MySQL geçişinin
+ * yalnızca repository bağlamasını değiştireceğinin de kanıtıdır.
  *
  * "Şimdi" varsayılan olarak 16.11.2026 Pazartesi 08:00'dir.
  */
@@ -35,6 +59,15 @@ abstract class AppTestCase extends TestCase
     protected FrozenClock $clock;
     protected Application $app;
     protected Container $container;
+    protected InMemoryDatabase $memory;
+
+    /**
+     * true: gerçek JSON repository'leri (geçici klasörde). Varsayılan: bellek içi.
+     */
+    protected function useJsonStorage(): bool
+    {
+        return false;
+    }
 
     protected function setUp(): void
     {
@@ -47,6 +80,37 @@ abstract class AppTestCase extends TestCase
             'paths' => ['data' => $this->dataDir, 'uploads' => $this->dataDir . '/uploads'],
         ], $this->clock);
         $this->container = $this->app->container();
+        $this->memory = new InMemoryDatabase();
+
+        if (!$this->useJsonStorage()) {
+            $this->bindInMemoryRepositories();
+        }
+    }
+
+    /**
+     * config/services.php'deki JSON bağlamalarını bellek içi uygulamalarla değiştirir.
+     * Servisler henüz üretilmediği için (lazy) bütün zincir bu repository'lerle kurulur.
+     */
+    private function bindInMemoryRepositories(): void
+    {
+        $db = $this->memory;
+        $config = $this->container->get(Config::class);
+        $c = $this->container;
+
+        $c->singleton(UserRepositoryInterface::class, static fn (): UserRepositoryInterface => new SuperAdminUserRepository(
+            new InMemoryUserRepository($db),
+            $config->string('super_admin.username'),
+            $config->string('super_admin.name'),
+            $config->string('super_admin.password_hash'),
+        ));
+        $c->singleton(PatientRepositoryInterface::class, static fn (): PatientRepositoryInterface => new InMemoryPatientRepository($db));
+        $c->singleton(DoctorRepositoryInterface::class, static fn (): DoctorRepositoryInterface => new InMemoryDoctorRepository($db));
+        $c->singleton(DepartmentRepositoryInterface::class, static fn (): DepartmentRepositoryInterface => new InMemoryDepartmentRepository($db));
+        $c->singleton(ScheduleRepositoryInterface::class, static fn (): ScheduleRepositoryInterface => new InMemoryScheduleRepository($db));
+        $c->singleton(TimeOffRepositoryInterface::class, static fn (): TimeOffRepositoryInterface => new InMemoryTimeOffRepository($db));
+        $c->singleton(AppointmentRepositoryInterface::class, static fn (): AppointmentRepositoryInterface => new InMemoryAppointmentRepository($db));
+        $c->singleton(WaitlistRepositoryInterface::class, static fn (): WaitlistRepositoryInterface => new InMemoryWaitlistRepository($db));
+        $c->singleton(TransactionManagerInterface::class, static fn (): TransactionManagerInterface => new InMemoryTransactionManager($db));
     }
 
     protected function tearDown(): void

@@ -54,7 +54,7 @@ final class SuperAdminTest extends AppTestCase
 
         self::assertSame(UserRole::SuperAdmin, $user->role);
         self::assertTrue($user->hasFullAccess());
-        self::assertSame([], $this->get(\App\Repository\Json\JsonStore::class)->rows('users'), 'Veri kaynağına yazılmaz');
+        self::assertSame([], $this->memory->users, 'Veri kaynağına yazılmaz');
     }
 
     public function testWrongAdminPasswordIsRejected(): void

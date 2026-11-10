@@ -20,6 +20,14 @@ final class ConcurrentBookingTest extends AppTestCase
     private const SLOT = '2026-11-17 10:00';
 
     /**
+     * Alt süreçler aynı veriyi görmeli: gerçek JSON dosyaları (geçici klasörde) ve flock kilidi.
+     */
+    protected function useJsonStorage(): bool
+    {
+        return true;
+    }
+
+    /**
      * @return list<string> Her sürecin çıktısı
      */
     private function bookSimultaneously(int $doctorId, bool $useLock): array
