@@ -1,633 +1,556 @@
 # Klinik Randevu Sistemi Tasarım Belgesi
 
+> **Sürüm:** Aşama 2 revizyonu (10.11.2026). Sunum 1 sonrası bölümler arasındaki çelişkiler giderildi ve
+> kararlar netleştirildi (bkz. `docs/ai-gunlugu/004-10.11.2026.md`). Sunum 1'deki sürüm git geçmişindedir.
+>
+> **Aşama 2 kapsamı:** Veritabanı bağlantısı **yoktur**. Veriler `storage/data/*.json` dosyalarında tutulur ve
+> Repository arayüzlerinin JSON uygulamalarıyla okunur. Aşama 3'te yalnızca Repository uygulaması (PDO + MySQL)
+> değişir; servisler, controller'lar ve testler aynı kalır.
+
 ## Sunum 1 anlatım dağılımı
 
 | Bölüm | Anlatan |
 | --- | --- |
-| Proje, çekirdek problem, roller ,mimari, 4. ER diyagramı , 7. Riskler, 8. Plan  | Hatice |
-| 2. Sınıf diyagramı, 5. Tasarım desenleri,3. Sıralama diyagramı, 6. Arayüz,  | Efe |
+| Proje, çekirdek problem, roller, mimari, 4. ER diyagramı, 7. Riskler, 8. Plan | Hatice |
+| 2. Sınıf diyagramı, 5. Tasarım desenleri, 3. Sıralama diyagramı, 6. Arayüz | Efe |
 
+## 0. Kapsam ve Roller
+
+Sistemde **3 rol** vardır:
+
+| Rol | Yapabildikleri |
+| --- | --- |
+| **Hasta** (`patient`) | Kayıt olur; poliklinik → doktor seçip haftalık ızgaradan boş slot alır; **yalnızca kendi** randevularını görür, iptal eder, tarihini değiştirir; bekleme listesine girer, teklifi kabul/ret eder; profil fotoğrafı yükler. |
+| **Doktor** (`doctor`) | Kendi günlük randevu listesini görür; geçmiş randevuyu `Completed` veya `NoShow` olarak işaretler. |
+| **Sekreter** (`secretary`) | Tüm randevuları arar/filtreler, hasta adına randevu alır/iptal eder; doktorların çalışma takvimini ve izinlerini yönetir; bekleme listesini izler; günlük randevu raporunu görür. |
+
+**Kapsam dışı:** SMS, e-posta, ödeme, tıbbi kayıt, Admin paneli, denetim kaydı (audit log), acil blok (blocked slots).
+Bekleme listesi teklifi uygulama içinde (hasta panelinde) gösterilir.
+
+---
 
 ## 1. Mimari
 
-## 1.1. Katmanlar
+### 1.1 Katmanlar
 
-Sistem 5 ana katmandan oluşur. Bağımlılık yönü **yukarıdan aşağıya** doğrudur; alt katmanlar üst katmanları bilmez. Sistemde **4 rol** vardır: Hasta, Doktor, Sekreter ve Admin.
+Bağımlılık yönü **yukarıdan aşağıya** doğrudur; alt katman üst katmanı bilmez.
 
-### 1.1.1 Arayüz (View)
-- **Görevi:** HTML5 şablonlarını, Bootstrap stillerini ve tarayıcıdaki JavaScript etkileşimlerini içerir. Slotlar, sayfa yenilenmeden `fetch` API ile HTML parçası olarak yüklenir ve DOM'a enjekte edilir.
-- **Kural:** İş kuralı ve doğrudan veritabanı sorgusu içeremez.
-- **Örnekler:** `views/`, `public/assets/js/slots.js`
+| Katman | Klasör | Sorumluluk | Yasak |
+| --- | --- | --- | --- |
+| **Router** | `public/index.php`, `src/Core/Router` | Tek giriş noktası; yol + yönteme göre controller'ı bulur, middleware'leri (CSRF, oturum, rol) çalıştırır | İş mantığı |
+| **Controller** | `src/Controller` | Girdiyi alır ve biçimsel doğrular, servisi çağırır, görünümü seçer, `Response` döndürür (HTML, JSON veya yönlendirme) | İş kuralı, veri erişimi |
+| **Service** | `src/Service` | Tüm iş kuralları: slot üretimi, çakışma önleme, bekleme listesi, yetki/sahiplik, rapor hesapları; transaction sınırı | SQL / dosya erişimi, `$_POST`, HTML |
+| **Repository** | `src/Repository` | Veri erişimi. `Contract/` arayüzler, `Json/` Aşama 2 uygulaması, `Mysql/` Aşama 3 uygulaması | İş kuralı |
+| **Model** | `src/Model` | Varlıklar (entity), enum'lar, olaylar (event), değer nesneleri (`Slot`) | Altyapıya bağımlılık |
+| **View** | `views/` | Yalnızca gösterim; tüm çıktılar `e()` (`htmlspecialchars`) ile kaçışlanır | İş mantığı |
+| **Core** | `src/Core` | Framework yerine kendi yazdığımız altyapı: Router, Request/Response, DI Container, View, Session, CSRF, Clock, EventDispatcher | Projeye özgü iş kuralı |
 
-### 1.1.2 Controller (İstek ve Yanıt Katmanı)
-- **Görevi:** HTTP isteklerini alır, girdiyi doğrular, oturum ve rol yetkisini kontrol eder, ilgili servisi çağırır.
-- **Çıktı:** Tam HTML sayfası veya AJAX istekleri için HTML parçası (partial). `application/json` kullanılmaz.
-- **Örnekler:** `AppointmentController`, `DoctorController`, `SecretaryController`, `AdminController`
-
-### 1.1.3 Servis (Çekirdek İş Mantığı)
-- **Görevi:** Projenin tüm iş kuralları burada yer alır: `DateTime` / `DateInterval` / `DatePeriod` ile slot üretimi, transaction yönetimi, çakışma önleme, bekleme listesi, denetim kaydı, istatistik ve raporlama.
-- **Örnekler:** `SlotGeneratorService`, `AppointmentService`, `WaitlistService`, `ReportService`, `DoctorStatsService`, `AuditService`, `DashboardService`
-
-### 1.1.4 Repository (Veri Erişim Katmanı)
-- **Görevi:** Veritabanı sorgularının yürütüldüğü katmandır.
-- **Kural:** Tüm SQL (PDO, JOIN, `FOR UPDATE` kilitleri) yalnızca burada yazılır.
-- **Örnekler:** `AppointmentRepository`, `ScheduleRepository`, `WaitlistRepository`, `AuditLogRepository`
-
-### 1.1.5 Veritabanı
-- **Görevi:** MySQL/MariaDB tabloları, kısıtlar (UNIQUE, Foreign Key) ve seed verileri.
-- **Tablolar (9):** `users`, `departments`, `doctors`, `schedules`, `time_off`, `blocked_slots`, `appointments`, `waitlist`, `audit_logs`
-
-### 1.1.6 Domain parçaları (katman dışı, paylaşılan)
-Enum, entity ve olay sınıfları ilgili modül klasöründe durur (örn. `AppointmentStatus`, `Appointment`, `AppointmentCanceledEvent`). Her katmandan kullanılabilir, ancak hiçbir katmana bağımlı değildir.
-
-### 1.1.7 Modül içi kural
-Proje modül bazlı (feature-first) klasörlenmiştir. Her modülde akış **Controller → Service → Repository** sırasını korur. Modüller birbirleriyle servis çağrısı veya olay (event) üzerinden konuşur; bir modül başka bir modülün Repository'sine doğrudan erişmez.
-
-
-## 1.2. Katman Şeması
+### 1.2 Katman Şeması
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│  1. ARAYÜZ (Tarayıcı)                                        │
-│     views/*.php  ·  Bootstrap CSS  ·  JS (fetch → AJAX)      │
-└──────────────────────────┬───────────────────────────────────┘
-                           │ HTTP (tam sayfa HTML / HTML parçası)
-┌──────────────────────────▼───────────────────────────────────┐
-│  public/index.php  →  Router  →  Middleware (Auth, Role)     │
-├──────────────────────────────────────────────────────────────┤
-│  2. CONTROLLER                                               │
-│     AppointmentController · DoctorController ·               │
-│     SecretaryController · AdminController ·                  │
-│     AuthController · WaitlistController · PatientController  │
-│     girdi doğrulama · yetki · HTML yanıt üretme              │
-└──────────────────────────┬───────────────────────────────────┘
-                           │ servis çağrısı
-┌──────────────────────────▼───────────────────────────────────┐
-│  3. SERVİS (İş Mantığı)                                      │
-│     SlotGeneratorService   AppointmentService (transaction)  │
-│     WaitlistService        AuthService       ReportService   │
-│     DoctorStatsService     DashboardService  AuditService    │
-│            │                                                 │
-│            │ olay yayınlar            ┌────────────────────┐ │
-│            └─────────────────────────►│ EventDispatcher    │ │
-│                                       │ (Observer)         │ │
-│        AppointmentCanceledEvent ─────►│ → WaitlistListener │ │
-│        (ve diğer olaylar)       ─────►│ → AuditListener    │ │
-│                                       └────────────────────┘ │
-└──────────────────────────┬───────────────────────────────────┘
-                           │ repository çağrısı
-┌──────────────────────────▼───────────────────────────────────┐
-│  4. REPOSITORY (PDO)                                         │
-│     UserRepository · DoctorRepository · ScheduleRepository   │
-│     TimeOffRepository · BlockedSlotRepository ·              │
-│     AppointmentRepository · WaitlistRepository ·             │
-│     DepartmentRepository · AuditLogRepository                │
-└──────────────────────────┬───────────────────────────────────┘
-                           │ SQL
-┌──────────────────────────▼───────────────────────────────────┐
-│  5. VERİTABANI (MySQL / MariaDB)                             │
-│     users · departments · doctors · schedules · time_off ·   │
-│     blocked_slots · appointments · waitlist · audit_logs     │
-└──────────────────────────────────────────────────────────────┘
-
-Yan bileşen (tüm katmanlar kullanır):
-  DOMAIN → AppointmentStatus · WaitlistStatus · UserRole ·
-           Entity'ler · AppointmentCanceledEvent
+┌──────────────────────────────────────────────────────────────────┐
+│  TARAYICI   views/*.php · Bootstrap 5 · public/assets/js (fetch) │
+└───────────────┬──────────────────────────────────▲───────────────┘
+                │ HTTP (form / fetch)               │ HTML | JSON | 302
+┌───────────────▼──────────────────────────────────┴───────────────┐
+│  public/index.php → Application → Router                         │
+│  Middleware: CsrfMiddleware → AuthMiddleware → RoleMiddleware    │
+├──────────────────────────────────────────────────────────────────┤
+│  CONTROLLER  Home · Auth · Appointment · SlotApi · Waitlist ·    │
+│              DoctorPanel · Secretary · Report · Profile          │
+└───────────────┬──────────────────────────────────────────────────┘
+                │ servis çağrısı
+┌───────────────▼──────────────────────────────────────────────────┐
+│  SERVICE  SlotGenerator (saf)   SlotService   AppointmentService │
+│           WaitlistService   AuthService   ScheduleService        │
+│           ReportService   ProfilePhotoService                    │
+│                │ dispatch(AppointmentCancelled)                  │
+│                ▼                                                 │
+│           EventDispatcher ──► WaitlistListener ──► WaitlistService│
+└───────────────┬──────────────────────────────────────────────────┘
+                │ arayüz üzerinden (…RepositoryInterface, TransactionManagerInterface)
+┌───────────────▼──────────────────────────────────────────────────┐
+│  REPOSITORY  Contract/  ◄── Json/ (Aşama 2)   ◄── Mysql/ (Aşama 3)│
+└───────────────┬──────────────────────────────────────────────────┘
+                │
+┌───────────────▼──────────────────────────────────────────────────┐
+│  VERİ   Aşama 2: storage/data/*.json (+ flock)                   │
+│         Aşama 3: MySQL 8 (transaction + FOR UPDATE + UNIQUE)     │
+└──────────────────────────────────────────────────────────────────┘
+Yan bileşenler (her katman kullanabilir): Model (entity, enum, event), ClockInterface
 ```
 
-### Örnek akış: Randevu alma
-
-1. Tarayıcı `GET /appointments/slots?doctor=3&week=2026-W42` ile slot ızgarasını AJAX (`fetch`) ile ister.
-2. `AppointmentController::slots()` isteği doğrular → `SlotGeneratorService`'i çağırır. Sonuç `views/partials/slot_grid.php` ile HTML parçası olarak döner, JS bunu sayfadaki alana yerleştirir.
-3. `SlotGeneratorService`, `ScheduleRepository`, `TimeOffRepository` ve `BlockedSlotRepository`'den veriyi alır; öğle arasını, izinleri ve acil blokları çıkararak slotları üretir; dolu slotları `AppointmentRepository`'den eler.
-4. Hasta slotu seçip isteğe bağlı ön not/şikâyet yazar; `POST /appointments` → `AppointmentController::store()` → `AppointmentService::book()`.
-5. Servis **transaction** açar, slotu kilitler (`SELECT ... FOR UPDATE`), müsaitse `INSERT` eder. UNIQUE kısıt, eşzamanlı ikinci isteği son savunma olarak reddeder. Çakışma yaşanırsa `SlotAlreadyTakenException` fırlatılır ve olay denetim kaydına yazılır.
-
-### Örnek akış: Randevu tarih/saat değiştirme
-
-1. Hasta `PUT /appointments/{id}/reschedule` ile yeni slot seçer.
-2. `AppointmentService::reschedule()` tek transaction içinde yeni slotu kilitler, eski randevuyu serbest bırakır, yenisini yazar.
-3. Eski slot boşaldığı için `AppointmentCanceledEvent` benzeri bir olay yayınlanır ve bekleme listesi tetiklenir.
-
-### Örnek akış: İptal ve bekleme listesi
-
-1. `AppointmentService::cancel()` durumu `AppointmentStatus::Canceled` yapar.
-2. Servis `AppointmentCanceledEvent` olayını `EventDispatcher`'a verir.
-3. `WaitlistListener` olayı yakalar → `WaitlistService::offerNext()` kuyruktaki ilk hastaya 30 dakikalık süreli teklif oluşturur (`Offered`, `expired_at` set edilir). `AuditListener` aynı olayı denetim kaydına yazar.
-4. Hasta reddederse (`Declined`) veya süre dolarsa (`Expired`) kuyrukta sıradaki hastaya geçilir. Süresi dolan teklifler `bin/process-waitlist.php` betiğiyle (cron) işlenir.
-
-### Örnek akış: Doktorun hasta durumunu güncellemesi
-
-1. Doktor günlük listede hastanın durumunu işaretler: `POST /doctor/appointments/{id}/status`.
-2. `RoleMiddleware` yalnızca ilgili doktorun kendi randevusunu güncellemesine izin verir.
-3. `AppointmentService::updateStatus()` durumu `Arrived → InConsultation → Completed` veya `NoShow` olarak ilerletir.
-
-## 1.3. Klasör Yapısı
+### 1.3 Klasör Yapısı
 
 ```
 clinic-appointment-system/
 ├── bin/
-│   └── process-waitlist.php          # Süresi dolan teklifleri işler (cron / manuel)
-│
+│   ├── seed.php                     # storage/data/*.json örnek verisini üretir (Aşama 2)
+│   └── process-waitlist.php         # Süresi dolan teklifleri işler (demo / elle)
 ├── config/
-│   ├── app.php                       # Zaman dilimi (Europe/Istanbul), teklif süresi (30 dk), randevu süresi
-│   ├── database.php                  # PDO bağlantı parametreleri
-│   ├── routes.php                    # Route tanımları (URL → Controller@method, middleware)
-│   ├── services.php                  # DI Container bağlamaları (servis/repository kurulumu)
-│   └── events.php                    # Observer kayıtları (olay → dinleyici)
-│
-├── database/
-│   ├── schema.sql                    # 9 tablo DDL (UNIQUE, FK, active_slot_key)
-│   └── seeds/
-│       └── SeedData.sql              # 4 poliklinik, 6 doktor, takvim, izin, kullanıcılar (4 rol)
-│
-├── public/                           # DOCUMENT ROOT
-│   ├── .htaccess                     # Tüm istekleri index.php'ye yönlendirir
-│   ├── index.php                     # Front Controller
-│   └── assets/
-│       ├── css/                      # Bootstrap 5 + özel CSS
-│       └── js/                       # slots.js (fetch/AJAX), geri sayım scriptleri
-│
-├── src/                              # Namespace: App\
-│   ├── Core/                         # Altyapı (iş mantığından bağımsız)
-│   │   ├── Container.php             # Basit DI container
-│   │   ├── Database.php              # PDO bağlantı üretici + transaction yardımcıları
-│   │   ├── View.php                  # Tam sayfa ve partial render motoru
-│   │   ├── Event/
-│   │   │   └── EventDispatcher.php   # Observer altyapısı
-│   │   ├── Middleware/
-│   │   │   ├── AuthMiddleware.php    # Oturum kontrolü
-│   │   │   └── RoleMiddleware.php    # Rol bazlı erişim (RBAC)
-│   │   └── Router/
-│   │       ├── Request.php
-│   │       ├── Response.php
-│   │       └── Router.php            # Regex tabanlı router
-│   │
-│   ├── Appointment/                  # Randevu modülü
-│   │   ├── Appointment.php           # Entity (patient_note alanı dahil)
-│   │   ├── AppointmentStatus.php     # Enum: Pending, Confirmed, Arrived, InConsultation, Completed, NoShow, Canceled, Rejected
-│   │   ├── AppointmentController.php # Sayfa + AJAX partial; arama/filtre, alma, değiştirme, iptal
-│   │   ├── AppointmentService.php    # Alma / iptal / değiştirme / durum güncelleme, transaction
-│   │   ├── AppointmentRepository.php # PDO, JOIN, FOR UPDATE, filtreli arama
-│   │   ├── SlotGeneratorService.php  # DateTime/DateInterval/DatePeriod slot motoru
-│   │   ├── Event/
-│   │   │   └── AppointmentCanceledEvent.php
-│   │   └── Exception/
-│   │       └── SlotAlreadyTakenException.php
-│   │
-│   ├── Auth/                         # Kimlik doğrulama ve rol
-│   │   ├── User.php
-│   │   ├── UserRole.php              # Enum: Patient, Doctor, Secretary, Admin
-│   │   ├── AuthController.php
-│   │   ├── AuthService.php
-│   │   └── UserRepository.php
-│   │
-│   ├── Department/                   # Poliklinik modülü
-│   │   ├── Department.php            # is_active alanı ile pasife alma
-│   │   └── DepartmentRepository.php
-│   │
-│   ├── Doctor/                       # Doktor, takvim, izin, blok, doktor paneli
-│   │   ├── Doctor.php
-│   │   ├── Schedule.php              # Çalışma günleri, mesai saatleri, öğle arası, slot süresi
-│   │   ├── TimeOff.php               # İzin / istisna günleri
-│   │   ├── BlockedSlot.php           # Acil durum saat bloğu
-│   │   ├── DoctorController.php      # Profil, takvim, günlük liste, durum güncelleme
-│   │   ├── DoctorService.php
-│   │   ├── DoctorStatsService.php    # Günlük hasta sayısı, doluluk oranı, yoğunluk
-│   │   ├── DoctorRepository.php
-│   │   ├── ScheduleRepository.php
-│   │   ├── TimeOffRepository.php
-│   │   └── BlockedSlotRepository.php
-│   │
-│   ├── Patient/                      # Hasta modülü
-│   │   └── PatientController.php     # Yalnızca kendi randevuları (aktif/geçmiş), profil
-│   │
-│   ├── Secretary/                    # Sekreter paneli ve rapor
-│   │   ├── SecretaryController.php   # Genel randevu yönetimi, manuel randevu, doluluk takibi
-│   │   └── ReportService.php         # Poliklinik/doktor bazlı günlük randevu raporu
-│   │
-│   ├── Admin/                        # Sistem yönetimi
-│   │   ├── AdminController.php       # Poliklinik, kullanıcı, rol, log, dashboard ekranları
-│   │   ├── UserManagementService.php # Doktor/sekreter hesabı açma, polikliniğe atama, rol değiştirme
-│   │   └── DashboardService.php      # Toplam randevu, iptal oranı, en yoğun poliklinikler
-│   │
-│   ├── Audit/                        # Denetim kayıtları
-│   │   ├── AuditLog.php              # Entity
-│   │   ├── AuditService.php          # İptal, çakışma, kullanıcı aktivitesi kaydı
-│   │   ├── AuditLogRepository.php
-│   │   └── AuditListener.php         # Observer: olayları audit_logs'a yazar
-│   │
-│   └── Waitlist/                     # Bekleme listesi
-│       ├── WaitlistEntry.php
-│       ├── WaitlistStatus.php        # Enum: Waiting, Offered, Accepted, Declined, Expired
-│       ├── WaitlistController.php    # Teklif kabul / ret
-│       ├── WaitlistService.php       # FIFO kuyruk, süreli teklif (expired_at)
-│       ├── WaitlistRepository.php
-│       └── WaitlistListener.php      # Observer: iptal olayını dinler
-│
-├── views/
-│   ├── admin/                        # Poliklinik, kullanıcı, log, dashboard
-│   ├── auth/                         # Giriş / kayıt
-│   ├── doctor/                       # Doktor paneli, performans ekranı
-│   ├── layouts/                      # Header, footer, navbar
-│   ├── partials/                     # AJAX ile gelen HTML parçaları (slot_grid.php vb.)
-│   ├── patient/                      # Randevu arama/alma, randevularım, bekleme listesi
-│   └── secretary/                    # Sekreter paneli, doluluk takibi, günlük rapor
-│
+│   ├── app.php                      # Saat dilimi, teklif süresi (30 dk), yollar, yükleme kuralları
+│   ├── services.php                 # DI bağlamaları: arayüz → JSON (Aşama 3: MySQL) uygulaması
+│   ├── events.php                   # Observer kayıtları: olay → dinleyiciler
+│   └── routes.php                   # URL → Controller::metot (+ middleware)
+├── database/                        # Aşama 3: migrations/*.sql, seeds/*.sql
+├── docker/php.ini
+├── docs/                            # tasarim.md, SRS, ai-gunlugu/, UI/, test raporu
+├── public/                          # DocumentRoot (dışarıya açık TEK klasör)
+│   ├── .htaccess · index.php
+│   └── assets/{css,js}              # app.css, app.js, slots.js (AJAX ızgara)
+├── src/                             # Namespace: App\
+│   ├── Core/                        # Application, Container, Config, helpers.php
+│   │   ├── Clock/                   # ClockInterface, SystemClock, FrozenClock
+│   │   ├── Event/                   # EventDispatcher, EventListenerInterface
+│   │   ├── Exception/               # HttpException, ContainerException
+│   │   ├── Http/                    # Request, Response
+│   │   ├── Middleware/              # MiddlewareInterface, CsrfMiddleware (+ Auth, Role: Faz 6)
+│   │   ├── Router/                  # Router, Route
+│   │   ├── Session/                 # Session (flash, eski girdi), Csrf
+│   │   └── View/                    # View
+│   ├── Controller/                  # *Controller.php
+│   ├── Service/                     # *Service.php, SlotGenerator.php, Exception/
+│   ├── Repository/
+│   │   ├── Contract/                # *RepositoryInterface.php, TransactionManagerInterface.php
+│   │   ├── Json/                    # JsonStore, FileLockTransactionManager, Json*Repository
+│   │   └── Mysql/                   # (Aşama 3) Pdo*, PdoTransactionManager
+│   └── Model/                       # Entity, Enum, Event, Slot
+├── storage/                         # Tarayıcıdan erişilemez, git'e girmez
+│   ├── data/                        # *.json veri dosyaları + .lock
+│   ├── uploads/                     # Profil fotoğrafları (rastgele adlı)
+│   └── logs/
 ├── tests/
-│   ├── Unit/                         # Veritabanı gerektirmeyen testler
-│   │   ├── TimeOffTest.php           # İzin gününde slot üretilmemesi
-│   │   ├── LunchBreakTest.php        # Öğle arasının atlanması
-│   │   └── BlockedSlotTest.php       # Acil blok saatlerinde slot üretilmemesi
-│   └── Integration/                  # Gerçek veritabanı gerektiren testler
-│       ├── ConcurrencyTest.php       # İki eşzamanlı istekten yalnızca birinin kabulü
-│       ├── WaitlistTriggerTest.php   # İptalde sıradaki hastaya teklif gitmesi
-│       └── RoleAccessTest.php        # Rollerin yetkisiz sayfalara erişiminin engellenmesi
-│
-├── Dockerfile
-├── docker-compose.yml
-├── composer.json                     # PSR-4: "App\\" => "src/"
-├── phpstan.neon
-├── phpunit.xml
+│   ├── Unit/                        # Saf testler (Core, SlotGenerator, servisler + JSON repo)
+│   ├── Integration/                 # Eşzamanlılık (iki ayrı PHP süreci)
+│   └── Fixtures/
+├── views/{layouts,partials,errors,home,auth,patient,doctor,secretary}/
+├── Dockerfile · docker-compose.yml · .env.example
+├── composer.json · phpunit.xml · phpstan.neon
 └── README.md
 ```
 
-## 1.4. Klasör Görev Tanımları
+### 1.4 İstek Yaşam Döngüsü
 
-### Altyapı ve Konfigürasyon
-- **`bin/`**: Komut satırından çalışan betikler. `process-waitlist.php`, süresi dolan bekleme listesi tekliflerini kapatıp sıradaki hastaya geçer.
-- **`config/`**: Zaman dilimi, teklif süresi, veritabanı bilgisi, route tanımları, DI bağlamaları ve Observer kayıtları. Kodu değiştirmeden ayar değiştirmeyi sağlar.
-- **`database/`**: 9 tablonun DDL şeması (`schema.sql`) ve sunum için örnek veriler (`seeds/`).
-- **`public/`**: Web sunucusunun tek dışa açık dizini. Yalnızca `index.php`, `.htaccess` ve statik dosyalar bulunur; kaynak kod dışarıdan erişilemez.
+1. Apache, var olmayan her yolu `.htaccess` ile `public/index.php`'ye yönlendirir.
+2. `Application` kurulur: `config/app.php` → çekirdek servisler → `config/services.php` → `config/events.php` → `config/routes.php`.
+3. Oturum başlatılır; önceki istekten kalan **flash mesajları**, **eski form girdisi** ve **CSRF jetonu** görünümlere paylaştırılır.
+4. `Router` rotayı bulur (`/appointments/{id}/cancel` gibi parametreli yollar desteklenir); bulamazsa 404, yöntem yanlışsa 405.
+5. Middleware zinciri: `CsrfMiddleware` (GET dışı her istekte) → `AuthMiddleware` → `RoleMiddleware`.
+6. Controller servisi çağırır ve `Response` döndürür. `HttpException` → hata sayfası veya JSON hata; beklenmeyen hata → `storage/logs/app.log` + 500 (ayrıntı yalnızca `APP_DEBUG=1`).
 
-### Çekirdek Altyapı (`src/Core/`)
-Framework yasak olduğu için sıfırdan yazdığımız bileşenler: Router, Request/Response, DI Container, PDO bağlantısı, View motoru, Middleware'ler (`AuthMiddleware`, `RoleMiddleware`) ve EventDispatcher. İş mantığı içermez, hiçbir modüle bağımlı değildir.
+### 1.5 Örnek Akışlar
 
-### Domain Modülleri (`src/`)
-- **`Appointment/`**: Randevu arama/filtreleme, alma, iptal, tarih/saat değiştirme, durum güncelleme; ön not saklama; `FOR UPDATE` ile çakışma önleme; `DateTime`/`DateInterval`/`DatePeriod` kullanan slot üretim motoru; durum enum'u ve iptal olayı.
-- **`Auth/`**: Kayıt, giriş, çıkış, parola doğrulama ve 4 değerli rol enum'u.
-- **`Department/`**: Poliklinik tanımları, ekleme/güncelleme/pasife alma.
-- **`Doctor/`**: Doktor profilleri, haftalık çalışma takvimi ve öğle arası (`schedules`), izin ve istisna günleri (`time_off`), acil durum saat blokları (`blocked_slots`), doktor paneli ve performans istatistikleri.
-- **`Patient/`**: Hastanın yalnızca kendi randevularını (aktif, tamamlanmış, iptal) görmesi ve profil işlemleri.
-- **`Secretary/`**: Sekreter paneli, genel ve manuel randevu yönetimi, doluluk takibi, bekleme kuyruğu izleme ve günlük randevu raporu.
-- **`Admin/`**: Poliklinik yönetimi, doktor/sekreter hesap tanımlama ve polikliniğe atama, rol yönetimi, genel klinik dashboard'u.
-- **`Audit/`**: İptal, çakışma ve kullanıcı aktivitelerinin `audit_logs` tablosuna yazılması; Observer ile olaylardan beslenir.
-- **`Waitlist/`**: FIFO kuyruk, 30 dakikalık süreli teklif, kabul/ret/süre dolma akışı ve iptal olayını dinleyen Observer.
+**Randevu alma**
+1. Hasta poliklinik ve doktor seçer; `slots.js`, `GET /api/slots?doctor_id=3&week=2026-11-16` isteğini `fetch` ile atar.
+2. `SlotApiController::index()` → `SlotService::weeklyGrid()`; servis `ScheduleRepository`, `TimeOffRepository`, `AppointmentRepository`'den veriyi alır ve saf `SlotGenerator`'a verir. Sonuç **JSON** döner, JS ızgarayı çizer.
+3. Hasta boş slotu seçer, isteğe bağlı not yazar → `POST /appointments` → `AppointmentService::book()`.
+4. Servis `TransactionManager::run()` içinde: slot geçerli mi (takvimden üretilebiliyor mu, gelecekte mi), doktorun o saatte aktif randevusu var mı, hastanın aynı saatte başka randevusu var mı? Hepsi geçerse kaydeder. Dolu ise `SlotAlreadyTakenException` → "Seçtiğiniz saat az önce doldu" mesajı.
 
-### Arayüz ve Testler
-- **`views/`**: Sunucu tarafında render edilen tam sayfa şablonları ve AJAX yanıtı olan HTML parçaları (`partials/`).
-- **`tests/Unit/`**: Veritabanına ihtiyaç duymayan testler (izin günü, öğle arası, acil blok).
-- **`tests/Integration/`**: Gerçek veritabanı ve iki ayrı bağlantı gerektiren testler (eşzamanlılık, iptal → teklif akışı, rol erişimi).
+**İptal ve bekleme listesi**
+1. `AppointmentService::cancel()` sahipliği ve durumu kontrol eder (yalnızca `Booked` ve gelecekteki randevu), durumu `Cancelled` yapar.
+2. Transaction **tamamlandıktan sonra** `AppointmentCancelled` olayı yayınlanır.
+3. `WaitlistListener` → `WaitlistService::offerFreedSlot()`: o doktor için uygun ilk `Waiting` kaydına (FIFO) 30 dakikalık teklif verir (`Offered`, `offered_starts_at`, `offer_expires_at`).
+4. Teklif süresince slot **herkese açık kalır**. Hasta kabul ederse (`POST /waitlist/{id}/accept`) servis transaction içinde slotun hâlâ boş olduğunu kontrol eder:
+   - Boşsa randevu oluşur, kayıt `Accepted` olur.
+   - Başkası almışsa teklif düşer, kayıt sıradaki yerini kaybetmeden `Waiting`'e döner ve hastaya "slot dolmuş" denir.
+5. Ret (`Declined`) veya süre dolumu (`Expired`) → aynı slot sıradaki uygun hastaya teklif edilir.
+6. Süre dolumları cron gerektirmez: hasta/sekreter panelleri ve slot uçları açılırken `WaitlistService::expireStale(now)` çalışır. Demo için `bin/process-waitlist.php` aynı metodu çağırır.
 
-## 1.5. Tasarım Kararları
+**Tarih/saat değiştirme**
+`AppointmentService::reschedule()` tek transaction içinde yeni slotu alır ve eskisini `Cancelled` yapar; commit sonrası eski slot için `AppointmentCancelled` yayınlanır, bekleme listesi tetiklenir.
 
-### Neden katmanlı mimari?
-Çekirdek problemler (slot üretimi, çakışma, kuyruk) saf iş mantığıdır. Bunları controller'a veya SQL'e gömmek test etmeyi imkânsız kılar. Katmanlı yapıda bu mantık serviste tek yerde durur ve sunumdaki kanıtlar doğrudan servis testleriyle gösterilir.
+**Doktorun durum güncellemesi**
+`POST /doctor/appointments/{id}/status`: yalnızca kendi randevusu ve başlangıç saati geçmişse `Booked → Completed | NoShow`.
 
-### Neden modül bazlı (feature-first) klasörleme?
-Her özellik (randevu, doktor, bekleme listesi, admin) kendi klasöründe toplanır; dört kişilik ekipte herkes bir modülü alıp diğerlerinin dosyalarına dokunmadan çalışabilir. Katmanlar ise modül içinde Controller → Service → Repository sırasıyla korunur.
+### 1.6 İş Kuralları
 
-### Neden ayrı Repository katmanı?
-SQL tek yerde toplandığı için servisler veritabanına doğrudan bağlı kalmaz. Sahte (mock) repository ile veritabanı olmadan hızlı birim testi yazılabilir; JOIN sorguları da düzenli biçimde tek yerde durur.
+| No | Kural |
+| --- | --- |
+| K1 | Slot süresi doktora özgüdür (`doctors.slot_minutes`). |
+| K2 | Bir gün birden fazla çalışma satırından oluşabilir (09:00–12:00, 13:00–17:00). **Öğle arası iki satır arasındaki boşluktur**; slot satır sınırını aşamaz (11:45'te başlayan 30 dk'lık slot üretilmez). |
+| K3 | Aynı doktorun aynı gündeki çalışma satırları çakışamaz (kayıt sırasında doğrulanır). |
+| K4 | `time_off` bir tarih-saat aralığıdır; tam gün izin veya gün içi istisna (ör. 14:00–16:00 toplantı) olabilir. Aralıkla **kesişen** slot üretilmez. |
+| K5 | Geçmiş slotlar alınamaz; ızgarada gösterilmez veya pasif görünür. |
+| K6 | Bir doktorun bir slotunda en fazla **bir aktif** (`Booked`) randevu olabilir. Aşama 2'de `flock`, Aşama 3'te `FOR UPDATE` + UNIQUE `active_slot_key` ile garanti edilir. |
+| K7 | Bir hastanın aynı saatte çakışan iki aktif randevusu olamaz. |
+| K8 | Hasta yalnızca kendi randevularını görür/değiştirir; doktor yalnızca kendi listesini görür. Sahiplik kontrolü **serviste** yapılır. |
+| K9 | İptal yalnızca `Booked` ve başlangıcı gelecekte olan randevuda yapılabilir. |
+| K10 | Bir hastanın bir doktor için en fazla bir açık (`Waiting`/`Offered`) bekleme kaydı olabilir. |
+| K11 | Teklif sırası: aynı doktor, `desired_date` boş veya slot tarihine eşit, `created_at` (eşitlikte `id`) en eski. Aynı slot için aynı anda tek teklif vardır. |
+| K12 | Teklif süresi `config/app.php` → `waitlist_offer_minutes` (30). |
 
-### Neden Servis katmanı transaction'ı yönetiyor?
-"Slot kontrolü + kayıt" tek atomik iş kuralıdır, bu yüzden transaction sınırı serviste olmalıdır. Çakışma önleme iki güvenceyle yapılır: transaction içinde `SELECT ... FOR UPDATE` (pessimistic locking) ve veritabanında UNIQUE kısıt. Uygulama kodu hata yapsa bile veri bozulmaz. Tarih/saat değiştirme de aynı sebeple tek transaction içinde yapılır.
+### 1.7 Tasarım Kararları ve Gerekçeleri
 
-> **İptal edilen randevular:** İptal edilen satır kalıyorsa `(doctor_id, starts_at)` üzerindeki UNIQUE o slotu sonsuza kadar kilitler. Bu yüzden `appointments` tablosunda aktif randevuda slot bilgisini, iptalde `NULL` tutan bir `active_slot_key` sütunu üzerinde UNIQUE tanımlanır (MySQL, UNIQUE'te birden fazla `NULL`'a izin verir). `NoShow` ve `Completed` durumlarında da slot zaten geçmişte olduğundan aynı mantık uygulanabilir.
+**Neden katmanlı ve katman bazlı klasör?** Hocanın zorunlu yapısı `Controller/Service/Repository/Model`'dir. Çekirdek problemler (slot, çakışma, kuyruk) saf iş mantığıdır ve serviste tek yerde durduğu için doğrudan birim testlerle kanıtlanır.
 
-### Neden `SlotGeneratorService` saf bir sınıf?
-Girdi: çalışma takvimi, öğle arası, randevu süresi, izinler, acil bloklar. Çıktı: slot listesi. Dışarıdan sadece veri aldığı için deterministiktir; "izinde slot yok", "öğle arası atlanıyor" ve "bloklu saatte slot yok" kanıtları saniyeler içinde çalışan birim testlerle gösterilir.
+**Neden Repository arayüzü + JSON uygulaması?** Aşama 2'de veritabanı yoktur. Servisler somut sınıfa değil arayüze bağımlıdır; `config/services.php`'deki bağlama değiştirilerek Aşama 3'e geçilir.
 
-### Neden Observer?
-`AppointmentService` iptal ederken bekleme listesini veya denetim kaydını bilmek zorunda kalmaz; sadece `AppointmentCanceledEvent` yayınlar, `WaitlistListener` ve `AuditListener` tepki verir. Yeni bir dinleyici eklemek mevcut kodu değiştirmeyi gerektirmez.
+**Neden `TransactionManagerInterface`?** "Kontrol et + kaydet" tek atomik iş kuralıdır, sınırı serviste olmalıdır. Servis yalnızca `$tx->run(fn () => ...)` çağırır:
+- `FileLockTransactionManager` (Aşama 2): `storage/data/.lock` dosyasına `flock(LOCK_EX)` alır, işlem bitene kadar diğer istekler bekler. Dosyalar geçici dosyaya yazılıp `rename` ile atomik değiştirilir.
+- `PdoTransactionManager` (Aşama 3): `beginTransaction/commit/rollBack`. Repository'de `SELECT ... FOR UPDATE` ve UNIQUE `active_slot_key` son savunma olarak kalır.
 
-### Neden AJAX'ta JSON yerine HTML parçası?
-Slot ızgarası sunucuda aynı view motoruyla üretilir; istemci tarafında ikinci bir şablonlama katmanı gerekmez. "Sayfa yenilenmeden slot yükleme" şartı karşılanır, iş mantığı ve görünüm tekrarı oluşmaz.
+**Neden olaylar commit'ten sonra yayınlanır?** Dinleyici (bekleme listesi) kendi transaction'ını açar. İptal geri alınırsa (rollback) teklif gönderilmemelidir.
 
-### Neden rol kontrolü middleware'de?
-`AuthMiddleware` oturumu, `RoleMiddleware` rolü route seviyesinde merkezi olarak denetler. Böylece Hasta, Doktor, Sekreter ve Admin sayfaları tek noktadan korunur; controller içine dağınık `if` kontrolleri yazılmaz. Kaynak sahipliği (doktorun yalnızca kendi randevusu, hastanın yalnızca kendi randevusu) servis katmanında ayrıca doğrulanır.
+**Neden `SlotGenerator` saf sınıf?** Girdi: takvim satırları, izinler, dolu randevular, hafta, slot süresi, "şimdi". Çıktı: `Slot` listesi. Dosya/DB'ye dokunmadığı için deterministiktir; "izinde slot yok" ve "öğle arası atlanıyor" testleri milisaniyede çalışır.
 
-### Neden denetim kaydı (audit log) ayrı modül?
-İptal, çakışma ve kullanıcı aktiviteleri iş mantığının yan etkisidir. Observer ile ayrı bir modülde toplanması, servisleri loglama koduyla kirletmez ve Admin'in tüm olayları tek tabloda incelemesini sağlar.
+**Neden `ClockInterface`?** "Şimdi" dışarıdan verilir. Testte `FrozenClock` ile zaman 31 dakika ileri alınıp teklifin düştüğü kanıtlanır.
 
-### Neden `Database` singleton değil?
-Eşzamanlılık testi iki ayrı veritabanı bağlantısı gerektirir; tek bir singleton bağlantı kendi kilidini zaten geçeceği için kilidin çalıştığını kanıtlayamaz. `Database` sınıfı yeni bağlantı üretir, normal istekte ise container tek bağlantıyı paylaştırır.
+**Neden AJAX'ta JSON?** Ortak şart "en az bir JSON döndüren uç nokta ve onu kullanan JavaScript" ister. Slot ızgarası `GET /api/slots` ile JSON olarak gelir, `slots.js` DOM'u oluşturur (değerler `textContent` ile basılır, XSS yok).
 
-### Neden `public/` tek giriş?
-Web sunucusunun kök dizini yalnızca `public/` olur; `src/`, `config/` ve veritabanı dosyaları dışarıdan erişilemez. Tüm istekler `index.php`'den (front controller) geçtiği için yetkilendirme middleware'i merkezi uygulanır.
+**Neden middleware?** CSRF ve rol kontrolü rota seviyesinde merkezi uygulanır; controller'larda dağınık `if` olmaz. Kaynak sahipliği (K8) ise iş kuralı olduğu için serviste kontrol edilir.
 
+**Neden `public/` tek giriş?** Apache'nin DocumentRoot'u `public/`'tir; `src/`, `config/`, `storage/` (JSON veriler, fotoğraflar) dışarıdan erişilemez.
 
-## 2. Sınıf diyagramı
+**Neden teklif süresince slot açık?** Ekip kararı: akış basit kalır, iptal edilen slot boşta beklemez. Bedeli: kabulde slotun hâlâ boş olduğu transaction içinde yeniden kontrol edilir (K6).
 
-## 2. Sınıf Diyagramı (Class Diagram)
+---
+
+## 2. Sınıf Diyagramı
+
+Okunabilirlik için iki parçaya bölünmüştür.
+
+**Şekil 2.1: Model (varlıklar, enum'lar, olay)**
 
 ```mermaid
 classDiagram
-    %% ==========================================
-    %% 1. ENUM'LAR (PHP 8.1 Standartı)
-    %% ==========================================
+    direction LR
+
     class UserRole {
         <<enumeration>>
-        PATIENT
-        DOCTOR
-        SECRETARY
+        Patient
+        Doctor
+        Secretary
     }
-
     class AppointmentStatus {
         <<enumeration>>
-        SCHEDULED
-        COMPLETED
-        CANCELLED
+        Booked
+        Completed
+        Cancelled
+        NoShow
+        +isActive() bool
+        +label() string
     }
-
     class WaitlistStatus {
         <<enumeration>>
-        PENDING
-        OFFERED
-        ACCEPTED
-        EXPIRED
+        Waiting
+        Offered
+        Accepted
+        Declined
+        Expired
+        +isOpen() bool
     }
 
-    %% ==========================================
-    %% 2. MODEL / VARLIK KATMANI VE KALITIM
-    %% ==========================================
     class User {
         +int id
         +string name
         +string email
         +string passwordHash
         +UserRole role
-        +login(string email, string password) bool
-        +changePassword(string newPassword) bool
+        +?string photoPath
     }
-
     class Patient {
         +string phone
     }
-
     class Doctor {
         +int departmentId
         +string title
+        +int slotMinutes
     }
-
-    class Secretary {
-        +string employeeNumber
-    }
-
-    %% Kalıtım (Inheritance)
     User <|-- Patient
     User <|-- Doctor
-    User <|-- Secretary
 
     class Department {
         +int id
         +string name
+        +string description
     }
-
     class Schedule {
         +int id
         +int doctorId
         +int dayOfWeek
         +string startTime
         +string endTime
-        +string lunchBreakStart
-        +string lunchBreakEnd
-        +int slotDurationMinutes
     }
-
     class TimeOff {
         +int id
         +int doctorId
-        +string startDate
-        +string endDate
+        +DateTimeImmutable startsAt
+        +DateTimeImmutable endsAt
         +string reason
+        +overlaps(start, end) bool
     }
-
-    class Slot {
-        +string date
-        +string startTime
-        +string endTime
-        +bool isAvailable
-    }
-
     class Appointment {
         +int id
         +int patientId
         +int doctorId
-        +string date
-        +string startTime
+        +DateTimeImmutable startsAt
+        +DateTimeImmutable endsAt
         +AppointmentStatus status
-        +cancel() void
+        +?string patientNote
+        +cancel(now) void
     }
-
-    class Waitlist {
+    class WaitlistEntry {
         +int id
         +int patientId
         +int doctorId
-        +string preferredDate
-        +string offerExpiresAt
+        +?DateTimeImmutable desiredDate
         +WaitlistStatus status
-        +isExpired() bool
+        +DateTimeImmutable createdAt
+        +?DateTimeImmutable offeredStartsAt
+        +?DateTimeImmutable offerExpiresAt
+        +offer(start, expiresAt) void
+        +isOfferExpired(now) bool
+    }
+    class Slot {
+        <<value object>>
+        +DateTimeImmutable start
+        +DateTimeImmutable end
+        +bool available
+    }
+    class AppointmentCancelled {
+        <<event>>
+        +int appointmentId
+        +int doctorId
+        +DateTimeImmutable startsAt
+        +DateTimeImmutable endsAt
     }
 
-    %% ==========================================
-    %% 3. OBSERVER KALIBI (İptal & Bekleme Listesi)
-    %% ==========================================
-    class AppointmentCancelObserverInterface {
-        <<interface>>
-        +onAppointmentCancelled(Appointment appointment) void
-    }
-
-    class WaitlistObserver {
-        -WaitlistService waitlistService
-        +onAppointmentCancelled(Appointment appointment) void
-    }
-
-    WaitlistObserver ..|> AppointmentCancelObserverInterface
-
-    %% ==========================================
-    %% 4. REPOSITORY KATMANI (Arayüz & Gerçekleme)
-    %% ==========================================
-    class AppointmentRepositoryInterface {
-        <<interface>>
-        +save(Appointment a) bool
-        +findById(int id) Appointment
-        +findOverlapping(int doctorId, string date, string time) Appointment
-        +updateStatus(int id, AppointmentStatus status) bool
-        +getDailyList(int doctorId, string date) array
-    }
-
-    class MysqlAppointmentRepository {
-        -PDO pdo
-        +save(Appointment a) bool
-        +findById(int id) Appointment
-        +findOverlapping(int doctorId, string date, string time) Appointment
-        +updateStatus(int id, AppointmentStatus status) bool
-        +getDailyList(int doctorId, string date) array
-    }
-
-    class WaitlistRepositoryInterface {
-        <<interface>>
-        +getNextInQueue(int doctorId, string date) Waitlist
-        +updateOfferStatus(int id, WaitlistStatus status, string expiresAt) bool
-    }
-
-    class MysqlWaitlistRepository {
-        -PDO pdo
-        +getNextInQueue(int doctorId, string date) Waitlist
-        +updateOfferStatus(int id, WaitlistStatus status, string expiresAt) bool
-    }
-
-    class ScheduleRepositoryInterface {
-        <<interface>>
-        +findByDoctor(int doctorId) array
-        +findTimeOffs(int doctorId, string date) array
-    }
-
-    class MysqlScheduleRepository {
-        -PDO pdo
-        +findByDoctor(int doctorId) array
-        +findTimeOffs(int doctorId, string date) array
-    }
-
-    MysqlAppointmentRepository ..|> AppointmentRepositoryInterface
-    MysqlWaitlistRepository ..|> WaitlistRepositoryInterface
-    MysqlScheduleRepository ..|> ScheduleRepositoryInterface
-
-    %% ==========================================
-    %% 5. SERVİS KATMANI (İş Mantığı & Transaction)
-    %% ==========================================
-    class SlotService {
-        -ScheduleRepositoryInterface scheduleRepo
-        -AppointmentRepositoryInterface appointmentRepo
-        +generateSlots(int doctorId, string date) array
-        -isLunchBreak(Schedule s, string time) bool
-    }
-
-    class WaitlistService {
-        -WaitlistRepositoryInterface waitlistRepo
-        +offerNextPatient(int doctorId, string date) void
-        +handleOfferResponse(int waitlistId, bool isAccepted) bool
-    }
-
-    class AppointmentService {
-        -AppointmentRepositoryInterface appointmentRepo
-        -array observers
-        +bookAppointment(int patientId, int doctorId, string date, string time) Appointment
-        +cancelAppointment(int appointmentId) bool
-        +attachObserver(AppointmentCancelObserverInterface obs) void
-        -notifyObservers(Appointment a) void
-    }
-
-    AppointmentService --> AppointmentRepositoryInterface : kullanır
-    AppointmentService --> AppointmentCancelObserverInterface : bildirir
-    WaitlistService --> WaitlistRepositoryInterface : kullanır
-    WaitlistObserver --> WaitlistService : tetikler
-    SlotService --> ScheduleRepositoryInterface : kullanır
-    SlotService --> AppointmentRepositoryInterface : kullanır
-
-    %% ==========================================
-    %% 6. CONTROLLER KATMANI (İstek Karşılama)
-    %% ==========================================
-    class AppointmentController {
-        -AppointmentService appointmentService
-        -SlotService slotService
-        +getAvailableSlots() void
-        +store() void
-        +cancel() void
-    }
-
-    class SecretaryController {
-        -AppointmentService appointmentService
-        -AppointmentRepositoryInterface appointmentRepo
-        +getDailyReport() void
-        +manageWaitlist() void
-    }
-
-    AppointmentController ..> AppointmentService : bağımlıdır
-    AppointmentController ..> SlotService : bağımlıdır
-    SecretaryController ..> AppointmentService : bağımlıdır
-
-    %% ==========================================
-    %% 7. KARDİNALİTE VE DOMAİN İLİŞKİLERİ (1-N vb.)
-    %% ==========================================
+    User --> UserRole
+    Appointment --> AppointmentStatus
+    WaitlistEntry --> WaitlistStatus
     Department "1" --> "0..*" Doctor : barındırır
-    Doctor "1" *-- "1..*" Schedule : mesai_takvimi
-    Doctor "1" *-- "0..*" TimeOff : izinleri
-    Doctor "1" --> "0..*" Slot : üretir
-    
-    Patient "1" --> "0..*" Appointment : randevusu_vardır
-    Doctor "1" --> "0..*" Appointment : hastası_vardır
-    
-    Doctor "1" --> "0..*" Waitlist : bekleyenler
-    Patient "1" --> "0..*" Waitlist : sıradadır
+    Doctor "1" *-- "1..*" Schedule : çalışma satırları
+    Doctor "1" *-- "0..*" TimeOff : izinler
+    Patient "1" --> "0..*" Appointment : alır
+    Doctor "1" --> "0..*" Appointment : muayene eder
+    Patient "1" --> "0..*" WaitlistEntry : sıraya girer
+    Doctor "1" --> "0..*" WaitlistEntry : bekleyenler
 ```
 
-## 3. Sıralama diyagramı
+**Şekil 2.2: Katmanlar, Repository ve Observer**
+
+```mermaid
+classDiagram
+    direction TB
+
+    class AppointmentController {
+        +store(Request) Response
+        +cancel(Request) Response
+        +reschedule(Request) Response
+    }
+    class SlotApiController {
+        +index(Request) Response
+    }
+    class WaitlistController {
+        +join(Request) Response
+        +accept(Request) Response
+        +decline(Request) Response
+    }
+
+    class SlotGenerator {
+        +generate(schedules, timeOffs, booked, weekStart, slotMinutes, now) Slot[]
+    }
+    class SlotService {
+        +weeklyGrid(doctorId, weekStart) Slot[]
+        +isBookable(doctorId, start) bool
+    }
+    class AppointmentService {
+        +book(patientId, doctorId, start, note) Appointment
+        +cancel(appointmentId, actor) void
+        +reschedule(appointmentId, newStart, actor) Appointment
+        +markStatus(appointmentId, status, doctor) void
+    }
+    class WaitlistService {
+        +join(patientId, doctorId, desiredDate) WaitlistEntry
+        +offerFreedSlot(doctorId, start, end) void
+        +accept(entryId, patientId) Appointment
+        +decline(entryId, patientId) void
+        +expireStale() int
+    }
+
+    class EventDispatcher {
+        +listen(eventClass, listener) void
+        +dispatch(event) void
+    }
+    class EventListenerInterface {
+        <<interface>>
+        +handle(object event) void
+    }
+    class WaitlistListener {
+        +handle(object event) void
+    }
+    class ClockInterface {
+        <<interface>>
+        +now() DateTimeImmutable
+    }
+    class TransactionManagerInterface {
+        <<interface>>
+        +run(callable work) mixed
+    }
+    class FileLockTransactionManager
+    class AppointmentRepositoryInterface {
+        <<interface>>
+        +find(id) ?Appointment
+        +findActiveForDoctorBetween(doctorId, from, to) Appointment[]
+        +findActiveByDoctorAndStart(doctorId, start) ?Appointment
+        +findForPatient(patientId) Appointment[]
+        +search(AppointmentFilter) Appointment[]
+        +save(Appointment) Appointment
+    }
+    class JsonAppointmentRepository
+    class WaitlistRepositoryInterface {
+        <<interface>>
+        +find(id) ?WaitlistEntry
+        +nextEligible(doctorId, date) ?WaitlistEntry
+        +findExpiredOffers(now) WaitlistEntry[]
+        +save(WaitlistEntry) WaitlistEntry
+    }
+    class JsonWaitlistRepository
+    class ScheduleRepositoryInterface {
+        <<interface>>
+        +forDoctor(doctorId) Schedule[]
+    }
+    class TimeOffRepositoryInterface {
+        <<interface>>
+        +forDoctorBetween(doctorId, from, to) TimeOff[]
+    }
+
+    AppointmentController ..> AppointmentService
+    SlotApiController ..> SlotService
+    WaitlistController ..> WaitlistService
+
+    SlotService --> SlotGenerator
+    SlotService --> ScheduleRepositoryInterface
+    SlotService --> TimeOffRepositoryInterface
+    SlotService --> AppointmentRepositoryInterface
+    AppointmentService --> SlotService
+    AppointmentService --> AppointmentRepositoryInterface
+    AppointmentService --> TransactionManagerInterface
+    AppointmentService --> EventDispatcher : AppointmentCancelled
+    AppointmentService --> ClockInterface
+    WaitlistService --> WaitlistRepositoryInterface
+    WaitlistService --> AppointmentRepositoryInterface
+    WaitlistService --> TransactionManagerInterface
+    WaitlistService --> ClockInterface
+
+    EventDispatcher o--> EventListenerInterface : dinleyiciler
+    WaitlistListener ..|> EventListenerInterface
+    WaitlistListener --> WaitlistService
+
+    FileLockTransactionManager ..|> TransactionManagerInterface
+    JsonAppointmentRepository ..|> AppointmentRepositoryInterface
+    JsonWaitlistRepository ..|> WaitlistRepositoryInterface
+```
+
+Diyagramda yer kazanmak için gösterilmeyen sınıflar: `UserRepositoryInterface`, `DepartmentRepositoryInterface`, `DoctorRepositoryInterface`, `PatientRepositoryInterface` ve JSON uygulamaları; `AuthService`, `ScheduleService`, `ReportService`, `ProfilePhotoService`; `HomeController`, `AuthController`, `DoctorPanelController`, `SecretaryController`, `ReportController`, `ProfileController`. Aşama 3'te her `Json*Repository`'nin yanına `Pdo*Repository`, `FileLockTransactionManager`'ın yanına `PdoTransactionManager` eklenir.
+
+---
+
+## 3. Sıralama Diyagramları
+
+**Şekil 3.1: Slot listeleme (AJAX) ve randevu alma, eşzamanlı çakışma dalı**
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor T as Tarayıcı
-    participant C as AppointmentController
-    participant S as AppointmentService
-    participant R as AppointmentRepository
+    actor H as Hasta (Tarayıcı)
+    participant C as Controller
+    participant SS as SlotService
+    participant G as SlotGenerator
+    participant AS as AppointmentService
+    participant TX as TransactionManager
+    participant R as Repository'ler
 
-    %% 1. Filtreleme ve Slotların Veritabanından Getirilmesi
-    T->>C: GET /slotlar?doctorId=5&date=2026-10-20
-    C->>S: getAvailableSlots(doctorId, date)
-    S->>R: findDoctorScheduleAndBookings(doctorId, date)
-    R-->>S: takvimVeMevcutRandevular[]
-    S->>S: boş slotları hesapla (DateTime / DatePeriod)
-    S-->>C: bosSlotlar[]
-    C-->>T: 200 OK (Slot ızgarası listelenir)
+    H->>C: GET /api/slots?doctor_id=3&week=2026-11-16 (fetch)
+    C->>SS: weeklyGrid(3, 2026-11-16)
+    SS->>R: schedules, timeOffs, aktif randevular
+    R-->>SS: veri
+    SS->>G: generate(..., now)
+    G-->>SS: Slot[]
+    SS-->>C: Slot[]
+    C-->>H: 200 JSON → JS ızgarayı çizer
 
-    %% 2. Randevu Seçimi, Doğrulama ve Transaction
-    T->>C: POST /randevu/al (doctorId, date, time)
-    C->>S: bookAppointment(patientId, doctorId, date, time)
-    
-    S->>S: transaction başlat
-    S->>R: findOverlapping(doctorId, date, time)
-    R-->>S: mevcutRandevu (null veya Appointment)
+    H->>C: POST /appointments (doctor_id, starts_at, note, _csrf)
+    C->>AS: book(patientId, 3, start, note)
+    AS->>TX: run(iş)
+    activate TX
+    Note over TX: Aşama 2: flock(LOCK_EX)<br/>Aşama 3: BEGIN + FOR UPDATE
+    AS->>SS: isBookable(3, start)
+    AS->>R: findActiveByDoctorAndStart(3, start)
+    alt slot boş
+        AS->>R: save(Appointment Booked)
+        TX-->>AS: commit
+        AS-->>C: Appointment
+        C-->>H: 302 /appointments + "Randevunuz oluşturuldu"
+    else slot dolu (eşzamanlı ikinci istek)
+        TX-->>AS: rollback
+        AS-->>C: SlotAlreadyTakenException
+        C-->>H: 302 geri + "Seçtiğiniz saat az önce doldu"
+    end
+    deactivate TX
+```
 
-    %% 3. Karar Bloğu: İlk durum müsaitlik, else durumu müsait olmama
-    alt slot müsait (çakışma yok - başarılı durum)
-        S->>R: save(yeniRandevu)
-        R-->>S: true (kaydedildi)
-        S->>S: transaction commit
-        S-->>C: Appointment objesi
-        C-->>T: 200 OK / "Randevu başarıyla oluşturuldu"
-    else slot müsait değil (eşzamanlı çakışma - hata durumu)
-        S->>S: transaction rollback
-        S-->>C: SlotAlreadyBookedException
-        C-->>T: 409 Conflict / "Seçilen saat dolmuştur, reddedildi"
+**Şekil 3.2: İptal → Observer → bekleme listesi teklifi → kabul**
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor A as Hasta A
+    actor B as Hasta B (sırada ilk)
+    participant AS as AppointmentService
+    participant D as EventDispatcher
+    participant L as WaitlistListener
+    participant WS as WaitlistService
+    participant R as Repository'ler
+
+    A->>AS: cancel(appointmentId)
+    AS->>R: status = Cancelled (transaction)
+    AS->>D: dispatch(AppointmentCancelled) [commit sonrası]
+    D->>L: handle(event)
+    L->>WS: offerFreedSlot(doctorId, start, end)
+    WS->>R: nextEligible(doctorId, date)
+    R-->>WS: B'nin kaydı (FIFO)
+    WS->>R: Offered, offer_expires_at = now + 30 dk
+
+    B->>WS: accept(entryId) [30 dk içinde]
+    WS->>WS: expireStale(now)
+    alt teklif geçerli ve slot hâlâ boş
+        WS->>R: Appointment(Booked) + kayıt Accepted (tek transaction)
+        WS-->>B: "Randevunuz oluşturuldu"
+    else slot bu arada başkası tarafından alındı
+        WS->>R: kayıt tekrar Waiting
+        WS-->>B: "Slot dolmuş, sıranız korunuyor"
+    else süre dolmuş
+        WS->>R: kayıt Expired
+        WS->>WS: offerFreedSlot → sıradaki hasta
+        WS-->>B: "Teklifin süresi doldu"
     end
 ```
 
-## 4. ER diyagramı
+---
 
-Bu bölüm, Aşama 3'te kurulacak veritabanının planıdır. Aşama 2'de JSON dosyaları kullanılsa bile her dosya aşağıdaki tablolardan birini izler; böylece veritabanına geçiş kolay olur.
+## 4. ER Diyagramı
 
-### 4.1 Sınıflardan varlıklara
+Aşama 3'te kurulacak veritabanının planıdır. Aşama 2'de her tablo bir JSON dosyasıdır (`storage/data/<tablo>.json`), alan adları aynıdır; böylece geçiş yalnızca Repository uygulamasını değiştirir.
+
+### 4.1 Sınıflardan tablolara
 
 | Sınıf | Tablo | Açıklama |
 | --- | --- | --- |
-| User | users | Ortak hesap bilgileri; `role` özniteliği patient, doctor ve secretary değerlerini alır |
-| Patient | patients | User'dan kalıtım alır; birincil anahtarı `users.id` ile aynıdır |
-| Doctor | doctors | User'dan kalıtım alır; birincil anahtarı `users.id` ile aynıdır |
-| Secretary | (ayrı tablo yok) | User'dan farklı bir özniteliği olmadığı için `users` tablosunda `role = 'secretary'` olarak tutulur |
-| Polyclinic | polyclinics | Poliklinik bilgileri |
-| Schedule | schedules | Doktorun çalışma günü, saat aralığı ve randevu süresi |
-| TimeOff | time_offs | Doktorun izin tarih aralıkları |
-| Appointment | appointments | Hastanın doktordan aldığı randevu |
-| WaitingListEntry | waiting_list_entries | Slot bulamayan hastanın bekleme kaydı ve teklif süresi |
-| Slot | (kaydedilmez) | `SlotService`, Schedule ve TimeOff kayıtlarından, alınmış randevuları çıkararak anlık hesaplar |
-| AppointmentService, SlotService, WaitlistService, AppointmentRepositoryInterface | (tablo değil) | İş mantığı ve erişim katmanı sınıflarıdır, veri tutmazlar |
-
+| User | `users` | Ortak hesap bilgileri; `role`: patient, doctor, secretary |
+| Patient | `patients` | User'dan kalıtım; birincil anahtarı `users.id` |
+| Doctor | `doctors` | User'dan kalıtım; birincil anahtarı `users.id` |
+| (Sekreter) | — | Ek özniteliği yok; `users.role = 'secretary'` |
+| Department | `departments` | Poliklinikler |
+| Schedule | `schedules` | Doktorun haftalık çalışma satırları |
+| TimeOff | `time_off` | İzin ve istisna aralıkları |
+| Appointment | `appointments` | Randevular |
+| WaitlistEntry | `waitlist` | Bekleme listesi ve teklif bilgisi |
+| Slot | — | Kaydedilmez; `SlotGenerator` anlık hesaplar |
 
 ### 4.2 ER diyagramı (Chen gösterimi)
 
-Okunabilirlik için diyagram iki parçaya bölünmüştür; ikisi de aynı varlıkları kullanır.`ISA` ("is a"), Patient ve Doctor'un birer User olduğunu, yani kalıtımı gösterir.
+`ISA` ("is a"), Patient ve Doctor'un birer User olduğunu (kalıtım) gösterir.
 
 **Şekil 4.1: Kullanıcılar, doktor ve çalışma planı**
 
@@ -636,40 +559,41 @@ flowchart TB
     USER[User]:::varlik
     PATIENT[Patient]:::varlik
     DOCTOR[Doctor]:::varlik
-    POLY[Polyclinic]:::varlik
+    DEPT[Department]:::varlik
     SCHED[Schedule]:::varlik
     TOFF[TimeOff]:::varlik
 
     ISA{ISA}:::iliski
     R_CAL{çalıştırır}:::iliski
-    R_ICR{içerir}:::iliski
+    R_ICR{çalışır}:::iliski
     R_IZN{izin_alır}:::iliski
 
     USER --- ISA
     ISA --- PATIENT
     ISA --- DOCTOR
-    POLY ---|1| R_CAL ---|N| DOCTOR
+    DEPT ---|1| R_CAL ---|N| DOCTOR
     DOCTOR ---|1| R_ICR ---|N| SCHED
     DOCTOR ---|1| R_IZN ---|N| TOFF
 
     USER --- u1(["<u>id</u>"]):::oznitelik
     USER --- u2(["name"]):::oznitelik
     USER --- u3(["email"]):::oznitelik
-    USER --- u4(["passwordHash"]):::oznitelik
+    USER --- u4(["password_hash"]):::oznitelik
     USER --- u5(["role"]):::oznitelik
+    USER --- u6(["photo_path"]):::oznitelik
     PATIENT --- p1(["phone"]):::oznitelik
     DOCTOR --- d1(["title"]):::oznitelik
-    POLY --- y1(["<u>id</u>"]):::oznitelik
-    POLY --- y2(["name"]):::oznitelik
-    POLY --- y3(["description"]):::oznitelik
+    DOCTOR --- d2(["slot_minutes"]):::oznitelik
+    DEPT --- y1(["<u>id</u>"]):::oznitelik
+    DEPT --- y2(["name"]):::oznitelik
+    DEPT --- y3(["description"]):::oznitelik
     SCHED --- s1(["<u>id</u>"]):::oznitelik
-    SCHED --- s2(["dayOfWeek"]):::oznitelik
-    SCHED --- s3(["startTime"]):::oznitelik
-    SCHED --- s4(["endTime"]):::oznitelik
-    SCHED --- s5(["slotDuration"]):::oznitelik
+    SCHED --- s2(["day_of_week"]):::oznitelik
+    SCHED --- s3(["start_time"]):::oznitelik
+    SCHED --- s4(["end_time"]):::oznitelik
     TOFF --- t1(["<u>id</u>"]):::oznitelik
-    TOFF --- t2(["startDate"]):::oznitelik
-    TOFF --- t3(["endDate"]):::oznitelik
+    TOFF --- t2(["starts_at"]):::oznitelik
+    TOFF --- t3(["ends_at"]):::oznitelik
     TOFF --- t4(["reason"]):::oznitelik
 
     classDef varlik fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111
@@ -677,14 +601,14 @@ flowchart TB
     classDef oznitelik fill:#f1f5f9,stroke:#64748b,color:#111
 ```
 
-**Şekil 4.2: Randevu ve bekleme listesi** (Patient ve Doctor varlıklarının öznitelikleri Şekil 4.1'de gösterilmiştir)
+**Şekil 4.2: Randevu ve bekleme listesi** (Patient ve Doctor öznitelikleri Şekil 4.1'de)
 
 ```mermaid
 flowchart TB
     PATIENT[Patient]:::varlik
     DOCTOR[Doctor]:::varlik
     APPT[Appointment]:::varlik
-    WAIT[WaitingListEntry]:::varlik
+    WAIT[WaitlistEntry]:::varlik
 
     R_RAN{randevu_alır}:::iliski
     R_MUA{muayene_eder}:::iliski
@@ -697,125 +621,175 @@ flowchart TB
     WAIT ---|N| R_BEK ---|1| DOCTOR
 
     APPT --- a1(["<u>id</u>"]):::oznitelik
-    APPT --- a2(["date"]):::oznitelik
-    APPT --- a3(["startTime"]):::oznitelik
+    APPT --- a2(["starts_at"]):::oznitelik
+    APPT --- a3(["ends_at"]):::oznitelik
     APPT --- a4(["status"]):::oznitelik
+    APPT --- a5(["patient_note"]):::oznitelik
+    APPT --- a6(["created_at"]):::oznitelik
     WAIT --- w1(["<u>id</u>"]):::oznitelik
-    WAIT --- w2(["preferredDate"]):::oznitelik
-    WAIT --- w3(["offerExpiresAt"]):::oznitelik
-    WAIT --- w4(["status"]):::oznitelik
+    WAIT --- w2(["desired_date"]):::oznitelik
+    WAIT --- w3(["status"]):::oznitelik
+    WAIT --- w4(["created_at"]):::oznitelik
+    WAIT --- w5(["offered_starts_at"]):::oznitelik
+    WAIT --- w6(["offer_expires_at"]):::oznitelik
 
     classDef varlik fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111
     classDef iliski fill:#fef3c7,stroke:#b45309,stroke-width:2px,color:#111
     classDef oznitelik fill:#f1f5f9,stroke:#64748b,color:#111
 ```
 
-### 4.3 Tablolar, anahtarlar ve ilişkiler
+### 4.3 Tablolar, anahtarlar ve kısıtlar
 
-Diyagramdaki varlıkların veritabanındaki karşılığı:
-
-| Tablo | Sütunlar | Yabancı anahtarlar |
+| Tablo | Sütunlar | Anahtar / kısıt |
 | --- | --- | --- |
-| users | id PK, name, email UK, passwordHash, role (patient, doctor, secretary) | - |
-| patients | id PK, phone | id → users.id |
-| polyclinics | id PK, name UK, description | - |
-| doctors | id PK, title | id → users.id, polyclinicId → polyclinics.id |
-| schedules | id PK, dayOfWeek, startTime, endTime, slotDuration | doctorId → doctors.id |
-| time_offs | id PK, startDate, endDate, reason | doctorId → doctors.id |
-| appointments | id PK, date, startTime, status (active, cancelled, completed) | patientId → patients.id, doctorId → doctors.id |
-| waiting_list_entries | id PK, preferredDate, offerExpiresAt, status (waiting, offered, accepted, declined, expired) | patientId → patients.id, doctorId → doctors.id |
+| `users` | id, name, email, password_hash, role, photo_path NULL, created_at | PK id · UNIQUE email · role ∈ {patient, doctor, secretary} |
+| `patients` | user_id, phone | PK/FK user_id → users.id |
+| `departments` | id, name, description | PK id · UNIQUE name |
+| `doctors` | user_id, department_id, title, slot_minutes | PK/FK user_id → users.id · FK department_id → departments.id · slot_minutes > 0 |
+| `schedules` | id, doctor_id, day_of_week, start_time, end_time | FK doctor_id · day_of_week 1–7 (ISO, 1 = Pazartesi) · end_time > start_time · aynı gün satırları çakışamaz (K3) |
+| `time_off` | id, doctor_id, starts_at, ends_at, reason | FK doctor_id · ends_at > starts_at |
+| `appointments` | id, patient_id, doctor_id, starts_at, ends_at, status, patient_note NULL, created_at, cancelled_at NULL | FK patient_id, doctor_id · status ∈ {booked, completed, cancelled, no_show} · **UNIQUE active_slot_key** (Aşama 3) |
+| `waitlist` | id, patient_id, doctor_id, desired_date NULL, status, created_at, offered_starts_at NULL, offer_expires_at NULL | FK patient_id, doctor_id · status ∈ {waiting, offered, accepted, declined, expired} · INDEX (doctor_id, status, created_at) |
 
-| İlişki | Tür | Yabancı anahtar | Sınıf diyagramındaki karşılığı |
-| --- | --- | --- | --- |
-| User - Patient / Doctor (ISA) | 1-1 (kalıtım) | patients.id, doctors.id | Patient ve Doctor, User'dan kalıtım alır |
-| Polyclinic - Doctor | 1-N | doctors.polyclinicId | çalıştırır |
-| Doctor - Schedule | 1-N (en az 1) | schedules.doctorId | içerir (1..*) |
-| Doctor - TimeOff | 1-N | time_offs.doctorId | izin_alır |
-| Patient - Appointment | 1-N | appointments.patientId | randevu_alır |
-| Doctor - Appointment | 1-N | appointments.doctorId | muayene_eder |
-| Patient - WaitingListEntry | 1-N | waiting_list_entries.patientId | sıraya_girer |
-| Doctor - WaitingListEntry | 1-N | waiting_list_entries.doctorId | bekleyenler |
+**Çift randevuyu veritabanında engellemek (Aşama 3):** MySQL'de kısmi UNIQUE indeks yoktur. İptal edilen satırın slotu kilitlememesi için üretilmiş (generated) sütun kullanılır:
 
-N-M ilişkiler ara tablolarla kurulmuştur. Bir hasta birçok doktordan randevu alır, bir doktor da birçok hastayı muayene eder; bu ilişki `appointments` tablosuyla kurulur ve tarih, saat ve durum bilgisini taşır. Aynı şekilde hasta ile doktor arasındaki bekleme ilişkisi `waiting_list_entries` tablosuyla kurulur.
+```sql
+active_slot_key VARCHAR(40) AS (
+    IF(status = 'booked', CONCAT(doctor_id, '|', starts_at), NULL)
+) STORED,
+UNIQUE KEY uq_active_slot (active_slot_key)
+```
 
-Veritabanı düzeyinde ek kısıtlar:
-- `appointments (doctorId, date, startTime)` aktif randevular için benzersiz olmalıdır; aynı doktorun aynı saatine ikinci randevu yazılamaz (FR10). Sıralama diyagramındaki `findOverlapping` kontrolü iki istek aynı anda geldiğinde yetmez; bu kısıt ikinci `save` işlemini veritabanı düzeyinde reddeder ve servis bunu `SlotAlreadyBookedException` olarak yakalayıp 409 döner. MySQL'de kısmi benzersiz indeks olmadığı için iptal edilmiş randevu aynı saati kilitlemesin diye, `status = 'active'` iken doktor, tarih ve saatten oluşan, aksi halde NULL olan üretilmiş (generated) bir sütun üzerinde UNIQUE tanımlanır.
-- `schedules.dayOfWeek` değeri 1 ile 7 arasındadır. Öğle arası ayrı bir sütunda değil, aynı günün iki ayrı satırı arasındaki boşluktur (örneğin 09:00-12:00 ve 13:00-17:00).
-- `time_offs.endDate`, `startDate` değerinden önce olamaz.
+MySQL UNIQUE'te birden fazla `NULL`'a izin verdiği için iptal/tamamlanmış randevular çakışmaz. Aşama 2'de bu garantiyi `flock` ile tek seferde tek yazıcı sağlar.
 
 ### 4.4 3NF kontrolü
 
 | Kural | Bu tasarımda nasıl sağlandı? |
 | --- | --- |
-| 1NF | Her hücrede tek değer var. Doktorun çalışma günleri tek bir metin olarak değil, her gün ve saat aralığı için ayrı satırla `schedules` tablosunda tutulur. İzin aralıkları `time_offs` tablosunda ayrı satırlardır. |
-| 2NF | `patients` ve `doctors` dahil tüm tablolarda birincil anahtar tek sütunludur (`id`); bu yüzden anahtarın yalnızca bir kısmına bağlı sütun oluşamaz. |
-| 3NF | Anahtar olmayan hiçbir sütun başka bir anahtar olmayan sütuna bağlı değildir. `appointments` içinde hasta adı, doktor adı veya poliklinik tutulmaz; yalnızca `patientId` ve `doctorId` vardır. Doktorun polikliniği `doctors.polyclinicId` üzerinden, ad ve e-posta bilgisi `users` üzerinden gelir. Randevunun bitiş saati de saklanmaz; `schedules.slotDuration` değerinden hesaplanır. |
+| 1NF | Her hücre tek değer. Çalışma saatleri tek metin değil, her aralık ayrı `schedules` satırı; izinler ayrı `time_off` satırları. |
+| 2NF | Tüm tablolarda birincil anahtar tek sütun; kısmi bağımlılık oluşamaz. |
+| 3NF | `appointments` içinde hasta/doktor adı veya poliklinik tutulmaz; doktorun polikliniği `doctors.department_id`, adı `users` üzerinden gelir. `appointments.ends_at` saklanır, çünkü `slot_minutes` sonradan değişebilir ve geçmiş randevunun süresi o anki değere bağlı olmamalıdır. Bu sütun başka bir anahtar olmayan sütundan türetilmiş değil, randevuya ait bir olgudur. |
 
 ### 4.5 Gerekçe
-Hasta, doktor ve sekreterin ortak bilgilerini (ad, e-posta, parola özeti, rol) users tablosunda topladık; hastaya ve doktora özel alanlar kendi tablolarında durur ve user_id yabancı anahtarıyla users tablosuna bağlanır; user_id benzersiz olduğundan bir kullanıcının en fazla bir hasta veya doktor profili olur. Böylece sınıf diyagramındaki kalıtım yapısı tabloya birebir yansır ve giriş ile yetki kontrolü (NFR1, NFR2) tek tablodan yürür. Boş randevu saatlerini tabloya yazmak yerine doktorun çalışma planından (schedules) ve izinlerinden (time_offs) hesaplıyoruz.Randevu ve bekleme kaydı, hasta ile doktor arasındaki N-M ilişkiyi kuran ara tablolardır. Tüm tablolar 3NF'dir; hiçbir bilgi birden fazla yerde tekrar edilmediği için güncelleme tutarsızlığı oluşmaz.
 
-
-
-## 5. Tasarım desenleri
-
-## 🎨 Tasarım Desenleri (Design Patterns) ve Tercih Gerekçeleri
+Hasta, doktor ve sekreterin ortak bilgileri (ad, e-posta, parola özeti, rol, fotoğraf) `users`'ta toplanır; hastaya ve doktora özel alanlar kendi tablolarında durur ve aynı `id` ile `users`'a bağlanır. Böylece sınıf diyagramındaki kalıtım tabloya birebir yansır ve giriş/yetki kontrolü tek tablodan yürür. Boş randevu saatleri tabloya yazılmaz; çalışma planından ve izinlerden anlık hesaplanır. Randevu ve bekleme kaydı, hasta ile doktor arasındaki N-M ilişkiyi kuran ara tablolardır.
 
 ---
 
-### 5.1 Repository Pattern (Veri Erişim Deseni)
+## 5. Tasarım Desenleri
 
-#### 📍 Projedeki Kullanım Alanı
-Veritabanı erişim mantığı ile iş mantığını tamamen ayırmak için uygulanmıştır. SQL sorguları (`SELECT`, `INSERT`, `JOIN` vb.) servis sınıflarına yazılmaz; her modülün kendi Repository sınıfında (`AppointmentRepository`, `ScheduleRepository`, `WaitlistRepository`, `AuditLogRepository` vb.) toplanır.
+### 5.1 Repository
 
-#### Akış Şeması
-+-----------------------+Servis Çağrısı   +-----------------------+PDO / SQL   
-+-----------------+ |  SlotGeneratorService 
-| ──────────────────►| ScheduleRepository.php| 
-─────────────►|  MySQL Database |
-+-----------------------+                    +-----------------------+               +-----------------+
+**Nerede:** `src/Repository/Contract/*RepositoryInterface` ve uygulamaları `Json/` (Aşama 2), `Mysql/` (Aşama 3).
 
+**Nasıl:** Servisler yalnızca arayüzü bilir. Hangi uygulamanın verileceği `config/services.php`'de tek satırla belirlenir:
 
-#### 💡 Neden ve Tercih Gerekçesi
-* **Kod Karmaşasını ve Tekrarını Önleme:** Karmaşık `JOIN` sorgularının ve veritabanı işlemlerinin Controller veya Service katmanını kirletmesi engellenir.
-* **Test Edilebilirlik (Testability):** Dokümanda belirtildiği gibi `SlotGeneratorService` sınıfı saf bir iş mantığı sınıfıdır. Unit testler yazılırken, gerçek bir veritabanına bağlanmak yerine sahte (Mock) bir Repository verilerek testler veritabanından bağımsız ve milisaniyeler içinde çalıştırılabilir.
-* **Pessimistic Locking (`FOR UPDATE`) İzolasyonu:** Eşzamanlı randevu isteklerinde çakışmayı önleyen veritabanı kilit sorguları (`SELECT ... FOR UPDATE`) servislerde karmaşa yaratmadan yalnızca Repository katmanında güvenle yönetilir.
-
----
-
-### 5.2. Dependency Injection (DI) Container (Bağımlılıkların Enjeksiyonu Deseni)
-
-#### 📍 Projedeki Kullanım Alanı
-Sınıf bağımlılıklarının (`Service` ve `Repository` nesneleri) elle `new` anahtar kelimesiyle oluşturulması yerine, merkezi bir container (`src/Core/Container.php`) ve konfigürasyon dosyası (`config/services.php`) üzerinden yönetilmesi esasına dayanır.
-
-#### Kod Mantığı Örneği
-`config/services.php` üzerinden otomatik bağımlılık çözme:
 ```php
-$container->bind(AppointmentService::class, function($c) {
-    return new AppointmentService(
-        $c->get(AppointmentRepository::class),
-        $c->get(EventDispatcher::class)
-    );
-});
+$c->singleton(AppointmentRepositoryInterface::class,
+    fn (Container $c) => new JsonAppointmentRepository($c->get(JsonStore::class)));
+// Aşama 3: new PdoAppointmentRepository($c->get(PDO::class))
+```
+
+**Neden:**
+- Dönem planı veri katmanını JSON'dan MySQL'e değiştirmeyi şart koşuyor; Repository olmadan bu geçiş tüm servislerin yeniden yazılması demek olurdu.
+- Testler gerçek veri katmanına bağlı kalmaz: servis testleri geçici klasördeki JSON veya bellek içi sahte repository ile çalışır.
+- Kilit ve sorgu ayrıntıları (`flock`, `FOR UPDATE`, JOIN) tek yerde toplanır, servisler okunaklı kalır.
+
+### 5.2 Observer
+
+**Nerede:** `src/Core/Event/EventDispatcher` (özne), `EventListenerInterface` (gözlemci), `src/Model/Event/AppointmentCancelled` (olay), `src/Service/WaitlistListener` (somut gözlemci), kayıtlar `config/events.php`.
+
+**Nasıl:**
+
+```php
+// config/events.php
+return [
+    AppointmentCancelled::class => [WaitlistListener::class],
+];
+
+// AppointmentService::cancel()
+$this->tx->run(fn () => /* durumu Cancelled yap */);
+$this->events->dispatch(new AppointmentCancelled($id, $doctorId, $startsAt, $endsAt));
+```
+
+**Neden:**
+- Proje isteri açıkça "iptal olayı bekleme listesini tetikler" der.
+- `AppointmentService` bekleme listesini tanımaz; yalnızca "iptal oldu" der. Randevu değiştirme (reschedule) de aynı olayı yayınladığı için bekleme listesi ikinci kez kodlanmaz.
+- Yeni bir tepki (ör. ileride rapor önbelleğini temizlemek) mevcut servisi değiştirmeden yeni dinleyiciyle eklenir (açık/kapalı ilkesi).
+
+### 5.3 Destekleyici desenler
+
+| Desen | Nerede | Neden |
+| --- | --- | --- |
+| **Front Controller** | `public/index.php` → `Application` | Tüm istekler tek noktadan geçer; güvenlik ve hata yönetimi merkezi |
+| **Chain of Responsibility** | `MiddlewareInterface` zinciri (CSRF → Auth → Role) | Her halka isteği ya durdurur ya `$next` ile iletir; yetki kontrolleri controller'dan ayrılır |
+| **Dependency Injection** | `src/Core/Container` | Servisler bağımlılıklarını yapıcıdan alır; testte sahte nesne verilebilir |
+| **Strategy** | `TransactionManagerInterface` (FileLock / Pdo), `ClockInterface` (System / Frozen) | Aynı servis kodu farklı ortamlarda farklı stratejiyle çalışır |
+
+---
 
 ## 6. Arayüz
 
- Ekran UI ları gösterilecek.
+Taslak ekranlar `docs/UI/` altındadır (anasayfa, giriş, kayıt, randevu paneli, sekreter paneli). Tüm ekranlar 375 px genişlikte yatay kaydırmasız çalışır (Bootstrap 5 grid), hatalı form gönderiminde girilen değerler korunur, başarı/hata mesajları flash ile gösterilir.
+
+| Ekran | Rol | Önemli öğeler |
+| --- | --- | --- |
+| Giriş / Kayıt | Herkes | CSRF, hatalı girişte e-posta korunur |
+| Randevu al | Hasta | Poliklinik → doktor seçimi, **haftalık slot ızgarası (AJAX/JSON)**, hafta ileri/geri, not alanı, "Bekleme listesine gir" |
+| Randevularım | Hasta | Aktif/geçmiş sekmeleri, iptal, tarih değiştirme, bekleyen teklif kartı (kalan süre, kabul/ret) |
+| Profil | Herkes | Profil fotoğrafı yükleme |
+| Doktor paneli | Doktor | Günlük liste (tarih seçici), Completed / NoShow işaretleme |
+| Sekreter paneli | Sekreter | Randevu arama (hasta adı/e-posta) + filtre (poliklinik, doktor, durum, tarih), hasta adına randevu, takvim ve izin yönetimi, bekleme listesi görünümü |
+| Günlük rapor | Sekreter | Seçilen gün için randevu listesi (JOIN), durum bazında toplamlar, iptal oranı, doluluk oranı |
+
+**Uç noktalar (özet)**
+
+| Yöntem | Yol | Rol |
+| --- | --- | --- |
+| GET/POST | `/login`, `/register`; POST `/logout` | Herkes |
+| GET | `/api/slots?doctor_id=&week=` → JSON | Hasta, Sekreter |
+| GET | `/appointments/book`, `/appointments` | Hasta |
+| POST | `/appointments`, `/appointments/{id}/cancel`, `/appointments/{id}/reschedule` | Hasta, Sekreter |
+| POST | `/waitlist`, `/waitlist/{id}/accept`, `/waitlist/{id}/decline` | Hasta |
+| GET/POST | `/doctor/appointments`, `/doctor/appointments/{id}/status` | Doktor |
+| GET/POST | `/secretary/appointments`, `/secretary/doctors/{id}/schedule`, `/secretary/doctors/{id}/time-off`, `/secretary/waitlist` | Sekreter |
+| GET | `/reports/daily?date=` | Sekreter |
+| GET/POST | `/profile`, `/profile/photo`; GET `/users/{id}/photo` | Giriş yapmış kullanıcı |
+
+**Güvenli dosya yükleme (profil fotoğrafı):** `UPLOAD_ERR_OK` kontrolü → boyut ≤ 2 MB → `finfo` ile gerçek MIME türü (jpeg/png/webp beyaz listesi) → `getimagesize` ile görüntü doğrulaması → `bin2hex(random_bytes(16))` + uzantı ile rastgele ad → `storage/uploads/` (public dışı) → `GET /users/{id}/photo` ile doğru `Content-Type` ve `X-Content-Type-Options: nosniff` başlığıyla sunulur.
+
+---
 
 ## 7. Riskler
 
 | Risk | Olasılık | Etki | Önlem |
 | --- | --- | --- | --- |
-| Aynı doktora aynı saat diliminde birden fazla randevu alınması | Orta | Yüksek | Eş zamanlı istekler için veritabanı düzeyinde tutarlılık kontrolleri yapılmalı. |
-| Doktorun izin veya istisna günlerinin takvime yanlış yansıtılması | Orta | Yüksek | Takvim ve slot üretimi için farklı izin, öğle arası ve istisna günü senaryolarını kapsayan birim ve entegrasyon testleri hazırlanmalı. |
-| Bekleme listesi teklifinin yanlış hastaya gitmesi veya sıra düzeninin bozulması | Orta | Yüksek | Bekleme listesinin sıralama kurallarının açıkça tanımlanması ve teklif gönderme akışının farklı senaryolarla test edilmesi. |
-| Teklif süresi dolduğu halde slotun başka hastaya açılmaması veya birden fazla hastaya sunulması | Orta | Yüksek | Teklif süresi dolumunun otomatik kontrol edilmesi, teklif durumlarının takip edilmesi. |
-| Hastanın başka bir hastaya ait randevu bilgilerine ulaşması | Düşük | Yüksek | Her randevu görüntüleme ve değiştirme işleminde kullanıcı kimliği ile yetki kontrolü yapılması ve erişim testleri. |
-| Randevu iptal veya değiştirme sırasında verilerin tutarsız hale gelmesi | Orta | Yüksek | İptal ve değişiklik işlemlerinin atomik yürütülmesi ve işlem sonrası veri tutarlılığının test edilmesi. |
-| Günlük randevu raporunda eksik veya hatalı kayıtların gösterilmesi | Orta | Orta | Rapor sorgularının sonuçlarının veritabanındaki kayıtlarla karşılaştırılması. |
-| Proje kapsamının geliştirme sırasında genişlemesi | Yüksek | Orta | SRS dokümanına sadık kalınması ve yeni özellik taleplerinin proje takvimini etkileyip etkilemeyeceğinin değerlendirilmesi. |
-| Doktor panelinde randevu bilgilerinin hatalı veya güncel olmayan şekilde görüntülenmesi | Orta | Yüksek | Günlük randevu listesi, tarih filtreleri ve randevu durumları için entegrasyon testleri yapılmalıdır. |
+| Aynı doktora aynı slotta birden fazla randevu | Orta | Yüksek | Aşama 2: `flock` ile tek yazıcı; Aşama 3: transaction + `FOR UPDATE` + UNIQUE `active_slot_key`; iki ayrı PHP süreciyle eşzamanlılık testi |
+| İzin, istisna veya öğle arasının takvime yanlış yansıması | Orta | Yüksek | Saf `SlotGenerator` için tam gün izin, gün içi istisna, öğle boşluğu, satır sınırı senaryolarını kapsayan birim testleri |
+| Bekleme listesinde teklifin yanlış hastaya gitmesi | Orta | Yüksek | FIFO kuralı (K11) açıkça tanımlı; sıra ve eşitlik durumları test edilir |
+| Teklif süresinin dolmasına rağmen sıradakine geçilmemesi | Orta | Yüksek | `ClockInterface` + `FrozenClock` ile 30 dk sınırı testi; süre dolumu istek anında ve CLI betiğiyle işlenir |
+| Teklif kabul edilirken slotun başkası tarafından alınmış olması | Orta | Orta | Kabul işlemi transaction içinde slotu yeniden kontrol eder; hasta sırasını kaybetmez |
+| Hastanın başka hastanın randevusuna erişmesi | Düşük | Yüksek | Rol middleware'i + servis katmanında sahiplik kontrolü (K8); erişim testleri |
+| İptal/değişiklikte veri tutarsızlığı | Orta | Yüksek | Tek transaction; olaylar commit sonrası yayınlanır |
+| JSON dosyasının yarım yazılması | Düşük | Yüksek | Geçici dosyaya yazıp `rename` ile atomik değiştirme |
+| Kapsamın genişlemesi | Yüksek | Orta | Admin, audit log, acil blok kapsamdan çıkarıldı; yeni istekler önce bu belgeye işlenir |
+
+---
 
 ## 8. Plan
 
-- Proje panosu (backlog):https://github.com/users/denizugurgenc02/projects/2
-- Kilometre taşları: Sunum 1 - 15.10.2026, Sunum 2 - 22.10.2026, Sunum 3 - 29.10.2026
+- Proje panosu (backlog): https://github.com/users/denizugurgenc02/projects/2
+- Sunum 1: 15.10.2026 (tamamlandı). Sunum 2 ve Sunum 3 tarihleri: **netleştirilecek**.
+
+| Faz | İçerik | Durum |
+| --- | --- | --- |
+| 0 | Tasarım belgesinin netleştirilmesi (bu belge) | ✅ |
+| 1 | Altyapı: Apache Docker, Router (parametreli yol, middleware), DI Container, Request/Response, Session/Flash/CSRF, View, Clock, EventDispatcher, PHPUnit/PHPStan | ✅ |
+| 2 | Model: varlıklar, enum'lar, `AppointmentCancelled` | ⏳ |
+| 3 | `SlotGenerator` (önce test): izin, öğle boşluğu, satır sınırı, geçmiş, dolu | ⏳ |
+| 4 | Repository arayüzleri + JSON uygulamaları, `FileLockTransactionManager`, `bin/seed.php` (4 poliklinik, 6 doktor) | ⏳ |
+| 5 | `AppointmentService` (alma/iptal/değiştirme), Observer, `WaitlistService`; eşzamanlılık testi | ⏳ |
+| 6 | Kayıt/giriş/çıkış, Auth/Role middleware, profil fotoğrafı yükleme | ⏳ |
+| 7 | Ekranlar: hasta, doktor, sekreter, günlük rapor | ⏳ |
+| 8 | Kalite: ≥10 çekirdek test, PHPStan hatasız, gereksinim-test izlenebilirlik tablosu → **Sunum 2** | ⏳ |
+| Aşama 3 | MySQL migration + seed, `Pdo*Repository`, `PdoTransactionManager` → **Final** | ⏳ |
