@@ -7,14 +7,16 @@ randevuları yönetir.
 Framework kullanılmadan, katmanlı mimariyle (router → controller → service → repository → view) yazılmıştır.
 
 - Tasarım: [`docs/tasarim.md`](docs/tasarim.md)
-- Test raporu ve gereksinim-test izlenebilirliği: [`docs/test-raporu.md`](docs/test-raporu.md)
-- AI günlüğü: [`docs/ai-gunlugu/`](docs/ai-gunlugu/)
+- Gereksinim-test izlenebilirlik tablosu: [`docs/izlenebilirlik.md`](docs/izlenebilirlik.md)
+- Yapay zekâ günlüğü: [`docs/ai-gunlugu.md`](docs/ai-gunlugu.md) (oturum dosyaları `docs/ai-gunlugu/`)
+- Süreç raporu: [`docs/surec-raporu.md`](docs/surec-raporu.md)
 
 ## Ekip
 
 - 2307231001 - Hatice AYVAZ
 - 2307231054 - Mehmet Efe KAYA
 - 2307231029 - Eren ÇİT
+- 2307231030 - Deniz Uğur GENÇ
 
 ## Gereksinimler
 
@@ -64,9 +66,13 @@ Seed çıktısında yazan **demo günü** (bugünden sonraki ilk iş günü) iç
 3. **Bekleme listesi:** Doç. Dr. Zeynep Demir'in demo günü tamamen dolu. Sekreter olarak *Randevular* ekranında
    o günün bir randevusunu iptal edin → `hasta@klinik.test` ile girin → *Randevularım*'da 30 dakikalık teklif
    kartı görünür → *Kabul Et*. Reddedilirse teklif sıradaki hastaya (Deniz Aydın) geçer.
-4. **Eşzamanlılık:** `docker compose exec app vendor/bin/phpunit --filter ConcurrentBooking`
+4. **Hata durumu:** Hasta, randevusuna 1 saatten az kala iptal edemez (FR4); geçersiz form gönderiminde
+   alan hataları gösterilir ve girilen değerler korunur.
+5. **Yetkisiz erişim:** Hasta olarak `/secretary` adresine gidin (403) veya başka hastanın randevu id'siyle
+   `/appointments/{id}/reschedule` deneyin (reddedilir).
+6. **Eşzamanlılık:** `docker compose exec app vendor/bin/phpunit --filter ConcurrentBooking`
    (iki ayrı PHP süreci aynı slotu ister, yalnızca biri kabul edilir).
-5. **Günlük rapor:** Sekreter → *Günlük Rapor*: liste, durum dağılımı, doluluk/iptal/gelmeme oranları.
+7. **Günlük rapor:** Sekreter → *Günlük Rapor*: liste, durum dağılımı, doluluk/iptal/gelmeme oranları.
 
 Süresi dolan teklifler sayfalar açılırken otomatik işlenir; elle tetiklemek için:
 `docker compose exec app php bin/process-waitlist.php`
@@ -92,9 +98,10 @@ Uçlar: `POST /admin/departments`, `POST /admin/departments/{id}`, `POST /admin/
 Tüm komutlar konteyner içinde çalışır:
 
 ```bash
-docker compose exec app composer test       # PHPUnit (83 test)
+docker compose exec app vendor/bin/phpunit  # PHPUnit (93 test)  — kısaca: composer test
 docker compose exec app composer analyse    # PHPStan (seviye 8)
-docker compose exec app composer check      # ikisi birden
+docker compose exec app composer lint       # PSR-12 (phpcs); otomatik düzeltme: composer lint-fix
+docker compose exec app composer check      # üçü birden
 ```
 
 > Windows'ta Git Bash kullanıyorsanız yol dönüşümünü kapatmak için komutların başına `MSYS_NO_PATHCONV=1` ekleyin.
@@ -123,5 +130,5 @@ docker compose exec app composer check      # ikisi birden
 | `config/` | Ayarlar, DI bağlamaları, olay dinleyicileri, rotalar |
 | `bin/` | `seed.php`, `process-waitlist.php` |
 | `storage/` | JSON veriler, yüklenen fotoğraflar, loglar (git'e girmez, dışarıdan erişilemez) |
-| `tests/` | PHPUnit: `Unit/` ve `Integration/` (eşzamanlılık) |
+| `tests/` | PHPUnit: `Unit/`, `Integration/` (eşzamanlılık), `Support/InMemory` (bellek içi sahte repository'ler) |
 | `docs/` | Tasarım, test raporu, SRS, UI taslakları, AI günlüğü |

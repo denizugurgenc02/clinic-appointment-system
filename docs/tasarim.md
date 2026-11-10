@@ -1,6 +1,6 @@
 # Klinik Randevu Sistemi Tasarım Belgesi
 
-> **Sürüm:** Aşama 2 revizyonu (10.11.2026). Aşama 2 uygulaması tamamlandı; test durumu `docs/test-raporu.md`. Sunum 1 sonrası bölümler arasındaki çelişkiler giderildi ve
+> **Sürüm:** Aşama 2 revizyonu (10.11.2026). Aşama 2 uygulaması tamamlandı; test durumu `docs/izlenebilirlik.md`. Sunum 1 sonrası bölümler arasındaki çelişkiler giderildi ve
 > kararlar netleştirildi (bkz. `docs/ai-gunlugu/004-10.11.2026.md`). Sunum 1'deki sürüm git geçmişindedir.
 >
 > **Aşama 2 kapsamı:** Veritabanı bağlantısı **yoktur**. Veriler `storage/data/*.json` dosyalarında tutulur ve
@@ -181,7 +181,7 @@ clinic-appointment-system/
 | K6 | Bir doktorun bir slotunda en fazla **bir aktif** (`Booked`) randevu olabilir. Aşama 2'de `flock`, Aşama 3'te `FOR UPDATE` + UNIQUE `active_slot_key` ile garanti edilir. |
 | K7 | Bir hastanın aynı saatte çakışan iki aktif randevusu olamaz. |
 | K8 | Hasta yalnızca kendi randevularını görür/değiştirir; doktor yalnızca kendi listesini görür. Sahiplik kontrolü **serviste** yapılır. |
-| K9 | İptal yalnızca `Booked` ve başlangıcı gelecekte olan randevuda yapılabilir. |
+| K9 | İptal yalnızca `Booked` ve başlangıcı gelecekte olan randevuda yapılabilir. **FR4:** hasta için başlangıçtan en az 60 dk önce (`cancellation_notice_minutes`); sekreter ve yönetici için bu süre yoktur. |
 | K10 | Bir hastanın bir doktor için en fazla bir açık (`Waiting`/`Offered`) bekleme kaydı olabilir. |
 | K11 | Teklif sırası: aynı doktor, `desired_date` boş veya slot tarihine eşit, `created_at` (eşitlikte `id`) en eski. Aynı slot için aynı anda tek teklif vardır. |
 | K12 | Teklif süresi `config/app.php` → `waitlist_offer_minutes` (30). |
@@ -809,6 +809,6 @@ GET dışındaki tüm isteklerde CSRF jetonu zorunludur (formlarda `_csrf`, AJAX
 | 5 | `AppointmentService` (alma/iptal/değiştirme), Observer, `WaitlistService`; eşzamanlılık testi | ✅ |
 | 6 | Kayıt/giriş/çıkış, rol middleware'leri, profil fotoğrafı yükleme | ✅ |
 | 7 | Ekranlar: hasta, doktor, sekreter, günlük rapor | ✅ |
-| 8 | Kalite: PHPStan seviye 8 hatasız, izlenebilirlik tablosu (`docs/test-raporu.md`) → **Sunum 2** | ✅ |
+| 8 | Kalite: PHPStan seviye 8 hatasız, izlenebilirlik tablosu (`docs/izlenebilirlik.md`) → **Sunum 2** | ✅ |
 | 9 | Süper yönetici (yerleşik, kısıtsız) + poliklinik/doktor/sekreter oluşturma (form + JSON POST) | ✅ |
 | Aşama 3 | MySQL migration + seed, `Pdo*Repository`, `PdoTransactionManager` → **Final** | ⏳ |
