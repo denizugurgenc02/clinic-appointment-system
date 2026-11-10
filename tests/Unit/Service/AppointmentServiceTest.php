@@ -127,6 +127,43 @@ final class AppointmentServiceTest extends AppTestCase
         self::assertSame(AppointmentStatus::Booked, $again->status, 'İptal edilen slot tekrar alınabilmeli');
     }
 
+    /**
+     * FR4 sınır durumu: başlangıca tam 60 dk kala iptal kabul, 59 dk kala red.
+     */
+    public function testPatientMustCancelAtLeastOneHourBeforeStart(): void
+    {
+        $doctor = $this->doctor();
+        $patient = $this->patient();
+        $exactlyOnTime = $this->service->book($patient->id(), $doctor->id(), self::at('2026-11-17 10:00'));
+        $tooLate = $this->service->book($patient->id(), $doctor->id(), self::at('2026-11-17 11:00'));
+
+        $this->clock->set(self::at('2026-11-17 09:00'));
+        self::assertSame(AppointmentStatus::Cancelled, $this->service->cancel($exactlyOnTime->id(), $patient)->status, '60 dk kala iptal edilebilmeli');
+
+        $this->clock->set(self::at('2026-11-17 10:01'));
+        $this->expectException(DomainException::class);
+        $this->expectExceptionMessage('en az 60 dakika');
+
+        $this->service->cancel($tooLate->id(), $patient);
+    }
+
+    public function testPatientCannotRescheduleWithinOneHourButSecretaryCanCancel(): void
+    {
+        $doctor = $this->doctor();
+        $patient = $this->patient();
+        $appointment = $this->service->book($patient->id(), $doctor->id(), self::at('2026-11-17 10:00'));
+        $this->clock->set(self::at('2026-11-17 09:30'));
+
+        try {
+            $this->service->reschedule($appointment->id(), self::at('2026-11-17 11:00'), $patient);
+            self::fail('Son 1 saatte hasta tarih değiştirememeli');
+        } catch (DomainRuleException) {
+        }
+
+        $secretary = new User(999, 'Sekreter', 's@klinik.test', 'x', UserRole::Secretary);
+        self::assertSame(AppointmentStatus::Cancelled, $this->service->cancel($appointment->id(), $secretary)->status, 'Sekreter için 1 saat kuralı yok');
+    }
+
     public function testRescheduleBooksNewSlotAndCancelsOldOne(): void
     {
         $doctor = $this->doctor();

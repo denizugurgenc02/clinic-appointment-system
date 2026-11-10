@@ -44,7 +44,17 @@ final class AppointmentService
         private readonly TransactionManagerInterface $tx,
         private readonly EventDispatcher $events,
         private readonly ClockInterface $clock,
+        /** FR4: hastanın iptal/değiştirme için en geç kaç dakika önceden işlem yapabileceği */
+        private readonly int $patientCancellationNoticeMinutes = 60,
     ) {
+    }
+
+    /**
+     * FR4: hasta için bildirim süresi; sekreter ve yönetici randevu başlayana kadar işlem yapabilir.
+     */
+    public function cancellationNoticeFor(User $actor): int
+    {
+        return $actor->is(UserRole::Patient) ? $this->patientCancellationNoticeMinutes : 0;
     }
 
     /**
@@ -83,7 +93,7 @@ final class AppointmentService
     {
         $appointment = $this->tx->run(function () use ($appointmentId, $actor): Appointment {
             $appointment = $this->findManageable($appointmentId, $actor);
-            $appointment->cancel($this->clock->now());
+            $appointment->cancel($this->clock->now(), $this->cancellationNoticeFor($actor));
 
             return $this->appointments->save($appointment);
         });
@@ -108,8 +118,11 @@ final class AppointmentService
             $old = $this->findManageable($appointmentId, $actor);
             $now = $this->clock->now();
 
-            if (!$old->canBeCancelled($now)) {
-                throw new DomainRuleException('Yalnızca aktif ve henüz başlamamış randevuların tarihi değiştirilebilir.');
+            $notice = $this->cancellationNoticeFor($actor);
+            if (!$old->canBeCancelled($now, $notice)) {
+                throw new DomainRuleException($notice > 0
+                    ? sprintf('Randevular başlangıçtan en az %d dakika önce iptal edilebilir veya değiştirilebilir.', $notice)
+                    : 'Yalnızca aktif ve henüz başlamamış randevuların tarihi değiştirilebilir.');
             }
 
             if ($old->startsAt == $newStart) {

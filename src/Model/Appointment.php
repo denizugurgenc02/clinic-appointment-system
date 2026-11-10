@@ -49,16 +49,21 @@ final class Appointment
 
     /**
      * K9: yalnızca aktif ve henüz başlamamış randevu iptal edilebilir.
+     * FR4: $noticeMinutes > 0 ise başlangıca en az bu kadar dakika kalmış olmalı (tam sınır dahil).
      */
-    public function canBeCancelled(DateTimeImmutable $now): bool
+    public function canBeCancelled(DateTimeImmutable $now, int $noticeMinutes = 0): bool
     {
-        return $this->status === AppointmentStatus::Booked && $this->startsAt > $now;
+        $deadline = $this->startsAt->modify('-' . $noticeMinutes . ' minutes');
+
+        return $this->status === AppointmentStatus::Booked && $now < $this->startsAt && $now <= $deadline;
     }
 
-    public function cancel(DateTimeImmutable $now): void
+    public function cancel(DateTimeImmutable $now, int $noticeMinutes = 0): void
     {
-        if (!$this->canBeCancelled($now)) {
-            throw new DomainException('Yalnızca aktif ve henüz başlamamış randevular iptal edilebilir.');
+        if (!$this->canBeCancelled($now, $noticeMinutes)) {
+            throw new DomainException($noticeMinutes > 0
+                ? sprintf('Randevular başlangıçtan en az %d dakika önce iptal edilebilir veya değiştirilebilir.', $noticeMinutes)
+                : 'Yalnızca aktif ve henüz başlamamış randevular iptal edilebilir.');
         }
 
         $this->status = AppointmentStatus::Cancelled;

@@ -4,6 +4,7 @@
  * @var list<\App\Model\AppointmentDetails> $past
  * @var list<\App\Model\WaitlistDetails>    $waitlist
  * @var \DateTimeImmutable                  $now
+ * @var int                                 $cancelNotice FR4: iptal için en geç kaç dakika önce
  * @var string                              $csrfToken
  */
 
@@ -62,14 +63,21 @@ $offers = array_filter($waitlist, static fn ($w) => $w->entry->status === Waitli
                         <?php if ($a->patientNote !== null): ?>
                             <p class="small mb-2">📝 <?= e($a->patientNote) ?></p>
                         <?php endif; ?>
-                        <div class="d-flex flex-wrap gap-2">
-                            <a class="btn btn-sm btn-outline-primary" href="/appointments/<?= e($a->id) ?>/reschedule">Tarihi Değiştir</a>
-                            <form method="post" action="/appointments/<?= e($a->id) ?>/cancel"
-                                  onsubmit="return confirm('Randevuyu iptal etmek istediğinize emin misiniz?');">
-                                <?php require __DIR__ . '/../partials/csrf.php'; ?>
-                                <button class="btn btn-sm btn-outline-danger">İptal Et</button>
-                            </form>
-                        </div>
+                        <?php if ($a->canBeCancelled($now, $cancelNotice)): ?>
+                            <div class="d-flex flex-wrap gap-2">
+                                <a class="btn btn-sm btn-outline-primary" href="/appointments/<?= e($a->id) ?>/reschedule">Tarihi Değiştir</a>
+                                <form method="post" action="/appointments/<?= e($a->id) ?>/cancel"
+                                      onsubmit="return confirm('Randevuyu iptal etmek istediğinize emin misiniz?');">
+                                    <?php require __DIR__ . '/../partials/csrf.php'; ?>
+                                    <button class="btn btn-sm btn-outline-danger">İptal Et</button>
+                                </form>
+                            </div>
+                            <p class="small text-muted mb-0 mt-2">
+                                İptal veya değişiklik için son saat: <?= e($a->startsAt->modify('-' . $cancelNotice . ' minutes')->format('d.m.Y H:i')) ?>
+                            </p>
+                        <?php else: ?>
+                            <p class="small text-muted mb-0">Randevuya <?= e($cancelNotice) ?> dakikadan az kaldığı için iptal/değişiklik yapılamaz. Gerekirse kliniği arayın.</p>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>

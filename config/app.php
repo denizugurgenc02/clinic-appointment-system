@@ -16,6 +16,9 @@ return [
     // Bekleme listesinde hastaya verilen teklifin geçerlilik süresi (dakika)
     'waitlist_offer_minutes' => 30,
 
+    // FR4: hasta randevusunu başlangıçtan en az bu kadar dakika önce iptal edebilir / değiştirebilir
+    'cancellation_notice_minutes' => 60,
+
     // Slot ızgarasında gösterilecek ileri hafta sayısı
     'booking_horizon_weeks' => 4,
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Core\Clock\ClockInterface;
 use App\Core\Config;
 use App\Core\Container;
+use App\Core\Event\EventDispatcher;
 use App\Repository\BuiltIn\SuperAdminUserRepository;
 use App\Repository\Contract\AppointmentRepositoryInterface;
 use App\Repository\Contract\DepartmentRepositoryInterface;
@@ -83,6 +84,17 @@ return static function (Container $c, Config $config): void {
         $c->get(AppointmentRepositoryInterface::class),
         $c->get(ClockInterface::class),
         $config->int('booking_horizon_weeks', 4),
+    ));
+
+    $c->singleton(AppointmentService::class, static fn (Container $c): AppointmentService => new AppointmentService(
+        $c->get(AppointmentRepositoryInterface::class),
+        $c->get(DoctorRepositoryInterface::class),
+        $c->get(PatientRepositoryInterface::class),
+        $c->get(SlotService::class),
+        $c->get(TransactionManagerInterface::class),
+        $c->get(EventDispatcher::class),
+        $c->get(ClockInterface::class),
+        $config->int('cancellation_notice_minutes', 60),
     ));
 
     $c->singleton(WaitlistService::class, static fn (Container $c): WaitlistService => new WaitlistService(

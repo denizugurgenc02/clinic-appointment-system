@@ -93,6 +93,7 @@ final class AppointmentController extends AbstractController
             'past' => array_reverse($past),
             'waitlist' => $this->waitlist->forPatient($user->id()),
             'now' => $now,
+            'cancelNotice' => $this->appointments->cancellationNoticeFor($user),
         ]);
     }
 
@@ -107,8 +108,8 @@ final class AppointmentController extends AbstractController
             return $this->failed($request, $e, '/appointments');
         }
 
-        if (!$details->appointment->canBeCancelled($this->clock->now())) {
-            $this->session->flash('warning', 'Bu randevunun tarihi artık değiştirilemez.');
+        if (!$details->appointment->canBeCancelled($this->clock->now(), $this->appointments->cancellationNoticeFor($this->user()))) {
+            $this->session->flash('warning', 'Bu randevunun tarihi artık değiştirilemez (en geç başlangıçtan 1 saat önce).');
 
             return $this->redirect('/appointments');
         }
