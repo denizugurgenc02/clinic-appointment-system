@@ -25,6 +25,15 @@ return [
         'uploads' => $root . '/storage/uploads',
     ],
 
+    // Yerleşik süper yönetici: veri kaynağında (JSON / MySQL) kaydı olmasa da her zaman vardır.
+    // Koda düz şifre değil yalnızca hash'i yazılır. Varsayılan şifre: asdf1234
+    // Üretimde SUPER_ADMIN_PASSWORD_HASH ortam değişkeniyle değiştirilmelidir.
+    'super_admin' => [
+        'username' => 'admin',
+        'name' => 'Sistem Yöneticisi',
+        'password_hash' => getenv('SUPER_ADMIN_PASSWORD_HASH') ?: '$2y$10$Vkde8vplwyHrJ2r5Bc90dOE1AkQn2XUA6wwVh1xl.ONVrvPmE7nsO',
+    ],
+
     // Profil fotoğrafı yükleme kuralları
     'upload' => [
         'max_bytes' => 2 * 1024 * 1024,

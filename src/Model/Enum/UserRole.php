@@ -9,6 +9,8 @@ enum UserRole: string
     case Patient = 'patient';
     case Doctor = 'doctor';
     case Secretary = 'secretary';
+    /** Yerleşik sistem yöneticisi: hiçbir rol/sahiplik kısıtına tabi değildir */
+    case SuperAdmin = 'super_admin';
 
     public function label(): string
     {
@@ -16,6 +18,7 @@ enum UserRole: string
             self::Patient => 'Hasta',
             self::Doctor => 'Doktor',
             self::Secretary => 'Sekreter',
+            self::SuperAdmin => 'Süper Yönetici',
         };
     }
 
@@ -28,6 +31,7 @@ enum UserRole: string
             self::Patient => '/appointments',
             self::Doctor => '/doctor',
             self::Secretary => '/secretary',
+            self::SuperAdmin => '/admin',
         };
     }
 }

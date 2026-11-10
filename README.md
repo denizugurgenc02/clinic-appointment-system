@@ -45,13 +45,14 @@ Uygulama: <http://localhost:8000> (port `.env` içindeki `APP_PORT` ile değişt
 
 ## Demo Hesapları
 
-Tüm hesapların şifresi: **`Klinik123!`**
+Seed hesaplarının şifresi: **`Klinik123!`**
 
 | Rol | E-posta | Not |
 | --- | --- | --- |
 | Hasta | `hasta@klinik.test` | Ali Veli; Doç. Dr. Zeynep Demir'in bekleme listesinde 1. sırada |
 | Doktor | `ayse.yilmaz@klinik.test` | Diğer doktorlar: `mehmet.kaya`, `zeynep.demir`, `can.ozturk`, `elif.sahin`, `ahmet.celik`, `selin.arslan` (`@klinik.test`) |
 | Sekreter | `sekreter@klinik.test` | Fatma Koç |
+| **Süper yönetici** | kullanıcı adı **`admin`**, şifre **`asdf1234`** | Yerleşik hesap: seed çalıştırılmasa da (veri boşken de) vardır; hiçbir kısıta tabi değildir |
 
 ## Demo Senaryosu (çekirdek problemler)
 
@@ -70,12 +71,28 @@ Seed çıktısında yazan **demo günü** (bugünden sonraki ilk iş günü) iç
 Süresi dolan teklifler sayfalar açılırken otomatik işlenir; elle tetiklemek için:
 `docker compose exec app php bin/process-waitlist.php`
 
+## Yönetim API'si (süper yönetici)
+
+Yönetim POST uçları HTML formunun yanında JSON da kabul eder. Oturum çerezi ve `X-CSRF-Token` başlığı
+(sayfadaki `<meta name="csrf-token">`) gereklidir:
+
+```bash
+curl -b cookies.txt -H "Content-Type: application/json" -H "X-CSRF-Token: <jeton>" \
+     -d '{"name":"Dermatoloji","description":"Cilt hastalıkları"}' http://localhost:8000/admin/departments
+# 201 {"message":"...","data":{"id":6,"name":"Dermatoloji",...}}   |   422 {"error":"...","errors":{"name":"..."}}
+```
+
+Uçlar: `POST /admin/departments`, `POST /admin/departments/{id}`, `POST /admin/doctors`, `POST /admin/secretaries`, `GET /api/departments`.
+
+> Üretimde varsayılan yönetici şifresi `SUPER_ADMIN_PASSWORD_HASH` ortam değişkeniyle değiştirilmelidir
+> (`php -r 'echo password_hash("yeni-sifre", PASSWORD_DEFAULT);'`).
+
 ## Geliştirme Komutları
 
 Tüm komutlar konteyner içinde çalışır:
 
 ```bash
-docker compose exec app composer test       # PHPUnit (73 test)
+docker compose exec app composer test       # PHPUnit (83 test)
 docker compose exec app composer analyse    # PHPStan (seviye 8)
 docker compose exec app composer check      # ikisi birden
 ```
@@ -89,6 +106,7 @@ docker compose exec app composer check      # ikisi birden
 | Hasta | Kayıt/giriş, poliklinik → doktor → **haftalık slot ızgarası (AJAX/JSON)**, not ile randevu, randevularım (yalnızca kendi), iptal, tarih değiştirme, bekleme listesi (teklif kabul/ret, sıradan çıkma), profil fotoğrafı |
 | Doktor | Günlük randevu listesi (tarih seçici, durum sayıları), başlamış randevuyu *Tamamlandı / Gelmedi* işaretleme |
 | Sekreter | Randevu arama (hasta adı/e-posta) ve filtreleme (poliklinik, doktor, durum, tarih), hasta adına randevu, iptal/değiştirme, doktor takvimi ve izin yönetimi, bekleme listesi izleme, günlük rapor |
+| Süper yönetici | Yukarıdakilerin tamamı (kısıtsız) + poliklinik ekleme/güncelleme, doktor ve sekreter hesabı açma (form veya JSON) |
 
 ## Klasör Yapısı
 

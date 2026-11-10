@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Controller\AdminController;
 use App\Controller\ApiController;
 use App\Controller\AppointmentController;
 use App\Controller\AuthController;
@@ -20,6 +21,7 @@ use App\Middleware\RequireDoctor;
 use App\Middleware\RequirePatient;
 use App\Middleware\RequirePatientOrSecretary;
 use App\Middleware\RequireSecretary;
+use App\Middleware\RequireSuperAdmin;
 use App\Middleware\ShareCurrentUser;
 
 /*
@@ -77,6 +79,15 @@ return static function (Router $router): void {
     $router->post('/secretary/time-off/{id}/delete', [ScheduleController::class, 'deleteTimeOff'])->middleware(RequireSecretary::class);
 
     $router->get('/reports/daily', [ReportController::class, 'daily'])->middleware(RequireSecretary::class);
+
+    // --- Süper yönetici (diğer tüm rotalara da erişir) ------------------------------------
+    // POST uçları form veya JSON ("Accept: application/json") ile çağrılabilir
+    $router->get('/admin', [AdminController::class, 'index'])->middleware(RequireSuperAdmin::class);
+    $router->get('/api/departments', [AdminController::class, 'departments'])->middleware(RequireSuperAdmin::class);
+    $router->post('/admin/departments', [AdminController::class, 'storeDepartment'])->middleware(RequireSuperAdmin::class);
+    $router->post('/admin/departments/{id}', [AdminController::class, 'updateDepartment'])->middleware(RequireSuperAdmin::class);
+    $router->post('/admin/doctors', [AdminController::class, 'storeDoctor'])->middleware(RequireSuperAdmin::class);
+    $router->post('/admin/secretaries', [AdminController::class, 'storeSecretary'])->middleware(RequireSuperAdmin::class);
 
     // --- Profil ---------------------------------------------------------------------------
     $router->get('/profile', [ProfileController::class, 'show'])->middleware(RequireAuthenticated::class);

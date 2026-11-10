@@ -136,7 +136,8 @@ final class AppointmentService
         return $this->tx->run(function () use ($appointmentId, $outcome, $doctor): Appointment {
             $appointment = $this->appointments->find($appointmentId) ?? throw new NotFoundException('Randevu bulunamadı.');
 
-            if (!$doctor->is(UserRole::Doctor) || $appointment->doctorId !== $doctor->id) {
+            $isOwnAppointment = $doctor->is(UserRole::Doctor) && $appointment->doctorId === $doctor->id;
+            if (!$isOwnAppointment && !$doctor->hasFullAccess()) {
                 throw new AccessDeniedException('Yalnızca kendi randevularınızı işaretleyebilirsiniz.');
             }
 
@@ -193,7 +194,7 @@ final class AppointmentService
         $appointment = $this->appointments->find($appointmentId) ?? throw new NotFoundException('Randevu bulunamadı.');
 
         $allowed = match ($actor->role) {
-            UserRole::Secretary => true,
+            UserRole::Secretary, UserRole::SuperAdmin => true,
             UserRole::Patient => $appointment->patientId === $actor->id,
             UserRole::Doctor => false,
         };

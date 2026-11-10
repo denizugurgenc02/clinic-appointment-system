@@ -7,7 +7,10 @@
  * @var list<\App\Model\Enum\AppointmentStatus> $statuses
  * @var \DateTimeImmutable                  $now
  * @var string                              $csrfToken
+ * @var \App\Model\User|null                $currentUser
  */
+
+use App\Model\Enum\AppointmentStatus;
 ?>
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <h1 class="h3 mb-0">Randevu Yönetimi</h1>
@@ -89,6 +92,17 @@
                                     <?php require __DIR__ . '/../partials/csrf.php'; ?>
                                     <button class="btn btn-sm btn-outline-danger">İptal</button>
                                 </form>
+                            </div>
+                        <?php elseif ($currentUser?->hasFullAccess() && $a->status === AppointmentStatus::Booked): ?>
+                            <?php /* Süper yönetici, başlamış randevunun sonucunu doktor adına işaretleyebilir */ ?>
+                            <div class="d-flex flex-wrap justify-content-end gap-1">
+                                <?php foreach ([AppointmentStatus::Completed, AppointmentStatus::NoShow] as $outcome): ?>
+                                    <form method="post" action="/doctor/appointments/<?= e($a->id) ?>/status">
+                                        <?php require __DIR__ . '/../partials/csrf.php'; ?>
+                                        <input type="hidden" name="status" value="<?= e($outcome->value) ?>">
+                                        <button class="btn btn-sm btn-outline-<?= e($outcome->color()) ?>"><?= e($outcome->label()) ?></button>
+                                    </form>
+                                <?php endforeach; ?>
                             </div>
                         <?php endif; ?>
                     </td>

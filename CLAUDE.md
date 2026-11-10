@@ -3,7 +3,7 @@
 Bu dosya, bu depoda çalışan Claude Code (ve ekipteki diğer AI araçları) için proje bağlamını ve kuralları tanımlar.
 Kaynak belgeler: `docs/proje_description.docx`, `docs/proje_requirements.docx`, `docs/proje_suggestion.docx` (hocanın isterleri).
 
-> Durum: **Aşama 2 uygulaması tamamlandı** (tüm özellikler JSON veri katmanıyla çalışıyor; 73 test, PHPStan seviye 8 hatasız). Güncel tasarım: `docs/tasarim.md`, test/izlenebilirlik: `docs/test-raporu.md`. Aşama 2'de veritabanı bağlantısı **yok**; veriler `storage/data/*.json` (`php bin/seed.php` ile doldurulur). Sıradaki: Aşama 3 (PDO + MySQL).
+> Durum: **Aşama 2 uygulaması tamamlandı** (tüm özellikler JSON veri katmanıyla çalışıyor; 83 test, PHPStan seviye 8 hatasız; yerleşik süper yönetici `admin`). Güncel tasarım: `docs/tasarim.md`, test/izlenebilirlik: `docs/test-raporu.md`. Aşama 2'de veritabanı bağlantısı **yok**; veriler `storage/data/*.json` (`php bin/seed.php` ile doldurulur). Sıradaki: Aşama 3 (PDO + MySQL).
 
 ## Proje Özeti
 

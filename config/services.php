@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Core\Clock\ClockInterface;
 use App\Core\Config;
 use App\Core\Container;
+use App\Repository\BuiltIn\SuperAdminUserRepository;
 use App\Repository\Contract\AppointmentRepositoryInterface;
 use App\Repository\Contract\DepartmentRepositoryInterface;
 use App\Repository\Contract\DoctorRepositoryInterface;
@@ -51,8 +52,16 @@ return static function (Container $c, Config $config): void {
         static fn (Container $c): TransactionManagerInterface => new FileLockTransactionManager($c->get(JsonStore::class), $dataDir . '/.lock'),
     );
 
+    // Kullanıcılar: JSON uygulaması, yerleşik süper yöneticiyi ekleyen Decorator ile sarılır.
+    // Aşama 3'te yalnızca içteki "new JsonUserRepository" -> "new PdoUserRepository" olur.
+    $c->singleton(UserRepositoryInterface::class, static fn (Container $c): UserRepositoryInterface => new SuperAdminUserRepository(
+        new JsonUserRepository($c->get(JsonStore::class)),
+        $config->string('super_admin.username', 'admin'),
+        $config->string('super_admin.name', 'Sistem Yöneticisi'),
+        $config->string('super_admin.password_hash'),
+    ));
+
     $repositories = [
-        UserRepositoryInterface::class => JsonUserRepository::class,
         PatientRepositoryInterface::class => JsonPatientRepository::class,
         DoctorRepositoryInterface::class => JsonDoctorRepository::class,
         DepartmentRepositoryInterface::class => JsonDepartmentRepository::class,

@@ -28,6 +28,29 @@ final class JsonDepartmentRepository implements DepartmentRepositoryInterface
         return $row === null ? null : self::hydrate($row);
     }
 
+    public function findByName(string $name): ?Department
+    {
+        $needle = mb_strtolower(trim($name));
+
+        foreach ($this->all() as $department) {
+            if (mb_strtolower($department->name) === $needle) {
+                return $department;
+            }
+        }
+
+        return null;
+    }
+
+    public function update(Department $department): Department
+    {
+        $this->store->update('departments', (int) $department->id, [
+            'name' => $department->name,
+            'description' => $department->description,
+        ]);
+
+        return $department;
+    }
+
     public function create(Department $department): Department
     {
         $department->id = $this->store->insert('departments', [

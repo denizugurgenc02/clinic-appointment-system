@@ -36,6 +36,9 @@ final class ProfilePhotoService
 
     public function upload(User $user, UploadedFile $file): string
     {
+        if ($user->is(UserRole::SuperAdmin)) {
+            throw new DomainRuleException('Yerleşik yönetici hesabı için profil fotoğrafı yüklenemez.');
+        }
         if ($file->error === UPLOAD_ERR_NO_FILE) {
             throw new DomainRuleException('Lütfen bir fotoğraf seçin.');
         }
@@ -76,7 +79,10 @@ final class ProfilePhotoService
     {
         $owner = $this->users->find($ownerId) ?? throw new NotFoundException('Kullanıcı bulunamadı.');
 
-        $allowed = $viewer->id === $ownerId || $viewer->is(UserRole::Secretary) || $owner->is(UserRole::Doctor);
+        $allowed = $viewer->id === $ownerId
+            || $viewer->is(UserRole::Secretary)
+            || $viewer->hasFullAccess()
+            || $owner->is(UserRole::Doctor);
         if (!$allowed) {
             throw new AccessDeniedException('Bu fotoğrafı görme yetkiniz yok.');
         }

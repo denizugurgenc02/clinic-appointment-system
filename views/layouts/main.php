@@ -30,6 +30,14 @@ $menu = match ($currentUser?->role) {
         '/secretary/waitlist' => 'Bekleme Listesi',
         '/reports/daily' => 'Günlük Rapor',
     ],
+    UserRole::SuperAdmin => [
+        '/admin' => 'Yönetim',
+        '/secretary' => 'Randevular',
+        '/secretary/appointments/new' => 'Yeni Randevu',
+        '/secretary/doctors' => 'Doktorlar & Takvim',
+        '/secretary/waitlist' => 'Bekleme Listesi',
+        '/reports/daily' => 'Günlük Rapor',
+    ],
     default => [],
 };
 ?>

@@ -13,8 +13,8 @@
                 <form method="post" action="/login" novalidate>
                     <?php require __DIR__ . '/../partials/csrf.php'; ?>
                     <div class="mb-3">
-                        <label for="email" class="form-label">E-posta</label>
-                        <input type="email" id="email" name="email" class="form-control" required autofocus
+                        <label for="email" class="form-label">E-posta veya kullanıcı adı</label>
+                        <input type="text" id="email" name="email" class="form-control" required autofocus
                                autocomplete="username" value="<?= e($old['email'] ?? '') ?>">
                     </div>
                     <div class="mb-4">
@@ -33,6 +33,7 @@
                 <li>Hasta: <code>hasta@klinik.test</code></li>
                 <li>Doktor: <code>ayse.yilmaz@klinik.test</code></li>
                 <li>Sekreter: <code>sekreter@klinik.test</code></li>
+                <li>Süper yönetici: <code>admin</code> / <code>asdf1234</code></li>
                 <li>Şifre (hepsi): <code>Klinik123!</code></li>
             </ul>
         </details>

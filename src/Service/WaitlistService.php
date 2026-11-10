@@ -234,7 +234,7 @@ final class WaitlistService
     {
         $entry = $this->waitlist->find($entryId) ?? throw new NotFoundException('Bekleme kaydı bulunamadı.');
 
-        if ($entry->patientId !== $patient->id) {
+        if ($entry->patientId !== $patient->id && !$patient->hasFullAccess()) {
             throw new AccessDeniedException('Bu bekleme kaydı size ait değil.');
         }
 

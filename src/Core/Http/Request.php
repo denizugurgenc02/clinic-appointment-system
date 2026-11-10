@@ -39,14 +39,26 @@ final class Request
             }
         }
 
+        // PHP, Content-Type başlığını HTTP_ öneki olmadan verir
+        if (is_string($_SERVER['CONTENT_TYPE'] ?? null)) {
+            $headers['content-type'] = $_SERVER['CONTENT_TYPE'];
+        }
+
         $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
         $uri = $_SERVER['REQUEST_URI'] ?? '/';
+
+        // JSON gövdeli istekler (fetch / API istemcileri) form alanları gibi okunur
+        $body = $_POST;
+        if (str_contains($headers['content-type'] ?? '', 'application/json')) {
+            $decoded = json_decode((string) file_get_contents('php://input'), true);
+            $body = is_array($decoded) ? $decoded : [];
+        }
 
         return new self(
             is_string($method) ? $method : 'GET',
             is_string($uri) ? $uri : '/',
             $_GET,
-            $_POST,
+            $body,
             $_FILES,
             $headers,
         );
@@ -142,6 +154,7 @@ final class Request
     {
         return str_starts_with($this->path(), '/api/')
             || str_contains($this->header('accept') ?? '', 'application/json')
+            || str_contains($this->header('content-type') ?? '', 'application/json')
             || $this->header('x-requested-with') === 'XMLHttpRequest';
     }
 

@@ -16,15 +16,22 @@
 
 ## 0. Kapsam ve Roller
 
-Sistemde **3 rol** vardır:
+Sistemde **3 rol** ve bir **yerleşik süper yönetici** vardır:
 
 | Rol | Yapabildikleri |
 | --- | --- |
 | **Hasta** (`patient`) | Kayıt olur; poliklinik → doktor seçip haftalık ızgaradan boş slot alır; **yalnızca kendi** randevularını görür, iptal eder, tarihini değiştirir; bekleme listesine girer, teklifi kabul/ret eder; profil fotoğrafı yükler. |
 | **Doktor** (`doctor`) | Kendi günlük randevu listesini görür; geçmiş randevuyu `Completed` veya `NoShow` olarak işaretler. |
 | **Sekreter** (`secretary`) | Tüm randevuları arar/filtreler, hasta adına randevu alır/iptal eder; doktorların çalışma takvimini ve izinlerini yönetir; bekleme listesini izler; günlük randevu raporunu görür. |
+| **Süper Yönetici** (`super_admin`) | Yerleşik hesap (`admin`). Hiçbir rol veya sahiplik kısıtına tabi değildir: tüm panellere girer, her randevuyu iptal eder/değiştirir/sonuçlandırır. Ek olarak poliklinik ekler/günceller, doktor ve sekreter hesabı açar. |
 
-**Kapsam dışı:** SMS, e-posta, ödeme, tıbbi kayıt, Admin paneli, denetim kaydı (audit log), acil blok (blocked slots).
+**Yerleşik süper yönetici (değişiklik notu, 10.11.2026):** Veri kaynağında kaydı yoktur; `SuperAdminUserRepository`
+Decorator'ı, hangi `UserRepositoryInterface` uygulaması kullanılırsa kullanılsın (JSON / MySQL) bu hesabı ekler
+(ayrılmış `id = 0`). Kullanıcı adı ve şifre hash'i `config/app.php` → `super_admin` içindedir; koda düz şifre yazılmaz,
+`SUPER_ADMIN_PASSWORD_HASH` ortam değişkeniyle değiştirilebilir. Yetki kontrolleri "rol uygun mu **veya**
+`User::hasFullAccess()`" biçimindedir: rol middleware'i ve servislerdeki sahiplik kontrolleri tek noktadan atlanır.
+
+**Kapsam dışı:** SMS, e-posta, ödeme, tıbbi kayıt, denetim kaydı (audit log), acil blok (blocked slots), poliklinik silme.
 Bekleme listesi teklifi uygulama içinde (hasta panelinde) gösterilir.
 
 ---
@@ -723,6 +730,7 @@ $this->events->dispatch(new AppointmentCancelled($id, $doctorId, $startsAt, $end
 | Desen | Nerede | Neden |
 | --- | --- | --- |
 | **Front Controller** | `public/index.php` → `Application` | Tüm istekler tek noktadan geçer; güvenlik ve hata yönetimi merkezi |
+| **Decorator** | `SuperAdminUserRepository` herhangi bir `UserRepositoryInterface`'i sarar | Yerleşik yönetici, JSON ve MySQL uygulamalarına dokunmadan eklenir (open-closed) |
 | **Chain of Responsibility** | `MiddlewareInterface` zinciri (CSRF → Auth → Role) | Her halka isteği ya durdurur ya `$next` ile iletir; yetki kontrolleri controller'dan ayrılır |
 | **Dependency Injection** | `src/Core/Container` | Servisler bağımlılıklarını yapıcıdan alır; testte sahte nesne verilebilir |
 | **Strategy** | `TransactionManagerInterface` (FileLock / Pdo), `ClockInterface` (System / Frozen) | Aynı servis kodu farklı ortamlarda farklı stratejiyle çalışır |
@@ -759,6 +767,10 @@ Taslak ekranlar `docs/UI/` altındadır (anasayfa, giriş, kayıt, randevu panel
 | POST | `/secretary/doctors/{id}/schedules`, `/secretary/schedules/{id}/delete`, `/secretary/doctors/{id}/time-off`, `/secretary/time-off/{id}/delete` | Sekreter |
 | GET | `/reports/daily?date=&department_id=` | Sekreter |
 | GET | `/profile`, `/users/{id}/photo`; POST `/profile/photo` | Giriş yapmış kullanıcı |
+| GET | `/admin`, `/api/departments` → JSON | Süper yönetici |
+| POST | `/admin/departments`, `/admin/departments/{id}`, `/admin/doctors`, `/admin/secretaries` (form **veya** JSON: başarı 201, hata 422 + alan hataları) | Süper yönetici |
+
+Süper yönetici yukarıdaki **tüm** rotalara da erişir.
 
 GET dışındaki tüm isteklerde CSRF jetonu zorunludur (formlarda `_csrf`, AJAX'ta `X-CSRF-Token`); geçersizse 403.
 
@@ -797,5 +809,6 @@ GET dışındaki tüm isteklerde CSRF jetonu zorunludur (formlarda `_csrf`, AJAX
 | 5 | `AppointmentService` (alma/iptal/değiştirme), Observer, `WaitlistService`; eşzamanlılık testi | ✅ |
 | 6 | Kayıt/giriş/çıkış, rol middleware'leri, profil fotoğrafı yükleme | ✅ |
 | 7 | Ekranlar: hasta, doktor, sekreter, günlük rapor | ✅ |
-| 8 | Kalite: 73 test, PHPStan seviye 8 hatasız, izlenebilirlik tablosu (`docs/test-raporu.md`) → **Sunum 2** | ✅ |
+| 8 | Kalite: PHPStan seviye 8 hatasız, izlenebilirlik tablosu (`docs/test-raporu.md`) → **Sunum 2** | ✅ |
+| 9 | Süper yönetici (yerleşik, kısıtsız) + poliklinik/doktor/sekreter oluşturma (form + JSON POST) | ✅ |
 | Aşama 3 | MySQL migration + seed, `Pdo*Repository`, `PdoTransactionManager` → **Final** | ⏳ |

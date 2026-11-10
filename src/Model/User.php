@@ -30,6 +30,15 @@ class User
     }
 
     /**
+     * Rol ve sahiplik kontrollerinin tamamını atlar mı? (yalnızca SuperAdmin)
+     * Yetki kontrolleri "rol uygun mu || hasFullAccess()" biçimindedir.
+     */
+    public function hasFullAccess(): bool
+    {
+        return $this->role === UserRole::SuperAdmin;
+    }
+
+    /**
      * Kayıtlı (id atanmış) kullanıcının kimliği.
      */
     public function id(): int

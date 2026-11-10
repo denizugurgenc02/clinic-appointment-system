@@ -15,5 +15,12 @@ interface DepartmentRepositoryInterface
 
     public function find(int $id): ?Department;
 
+    /**
+     * Büyük/küçük harf duyarsız ad araması (benzersiz ad kontrolü için).
+     */
+    public function findByName(string $name): ?Department;
+
     public function create(Department $department): Department;
+
+    public function update(Department $department): Department;
 }

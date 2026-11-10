@@ -136,7 +136,7 @@ final class AppointmentController extends AbstractController
 
         $this->success('Randevunuz ' . $new->startsAt->format('d.m.Y H:i') . ' olarak güncellendi.');
 
-        return $this->redirect($this->user()->is(UserRole::Secretary) ? '/secretary' : '/appointments');
+        return $this->redirect($this->user()->is(UserRole::Patient) ? '/appointments' : '/secretary');
     }
 
     /**

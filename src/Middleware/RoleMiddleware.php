@@ -16,7 +16,7 @@ use App\Service\AuthService;
  * Rota seviyesinde oturum ve rol kontrolü (her işlemde yetki kontrolü).
  *
  * - Giriş yapılmamışsa: sayfa isteğinde /login'e yönlendirir, AJAX isteğinde 401 JSON.
- * - Rol uygun değilse: 403.
+ * - Rol uygun değilse: 403. Süper yönetici (hasFullAccess) her zaman geçer.
  *
  * Alt sınıflar yalnızca izin verilen rolleri söyler (RequirePatient, RequireSecretary ...).
  */
@@ -47,7 +47,8 @@ abstract class RoleMiddleware implements MiddlewareInterface
             return Response::redirect('/login');
         }
 
-        if (!in_array($user->role, $this->roles(), true)) {
+        // Süper yönetici tüm rotalara erişir
+        if (!$user->hasFullAccess() && !in_array($user->role, $this->roles(), true)) {
             throw HttpException::forbidden();
         }
 

@@ -1,6 +1,6 @@
 # Test Raporu ve Gereksinim-Test İzlenebilirlik Tablosu
 
-> **Durum (10.11.2026, Aşama 2 — JSON veri katmanı):** 73 test, 179 doğrulama, **hepsi başarılı**.
+> **Durum (10.11.2026, Aşama 2 — JSON veri katmanı):** 83 test, 212 doğrulama, **hepsi başarılı**.
 > PHPStan seviye 8: **hata yok**.
 >
 > ```bash
@@ -64,12 +64,24 @@ Test sınıfları `tests/` altındadır. Servis testleri (`tests/Support/AppTest
 | Transaction / rollback | `JsonStoreTest::testFailedTransactionRollsBackAllWrittenTables` |
 | Observer | `EventDispatcherTest` (2 test) + `WaitlistServiceTest` (iptal olayıyla uçtan uca) |
 
-## 4. Altyapı testleri
+## 4. Süper yönetici ve yönetim işlemleri
+
+| Gereksinim | Testler (`SuperAdminTest`) |
+| --- | --- |
+| Veri kaynağı boşken de `admin` / `asdf1234` ile giriş; veri kaynağına yazılmaz | `testAdminCanLogInWithUsernameEvenWhenDataStoreIsEmpty`, `testWrongAdminPasswordIsRejected` |
+| Hiçbir rol kısıtına tabi değil | `testAdminPassesEveryRoleRestriction` (9 panel) |
+| Sahiplik kurallarını atlar (başkasının randevusunu iptal, doktor adına sonuç) | `testAdminBypassesOwnershipRules` |
+| Yönetim uçları diğer rollere kapalı | `testOtherRolesCannotUseAdminEndpoints` |
+| Poliklinik oluşturma: form POST ve JSON POST (201 / 422) | `testAdminCreatesDepartmentViaFormPost`, `testAdminCreatesDepartmentViaJsonAndDuplicateIsRejected` |
+| Doktor hesabı açma → takvim → randevu alınabilir | `testAdminCreatesDoctorThatCanBeBookedAfterScheduleIsAdded` |
+| `admin` kullanıcı adı ayrılmış; personel doğrulaması | `testAdminUsernameIsReservedInTheDecoratedRepository`, `testStaffAccountValidation` |
+
+## 5. Altyapı testleri
 
 `ContainerTest` (4), `RouterTest` (7), `RequestTest` (3), `ViewTest` (3), `ClockTest` (1), `EventDispatcherTest` (2),
 `CsrfMiddlewareTest` (4), `JsonStoreTest` (2).
 
-## 5. Elle (HTTP) yapılan uçtan uca kontroller — 10.11.2026
+## 6. Elle (HTTP) yapılan uçtan uca kontroller — 10.11.2026
 
 Docker'daki Apache üzerinde `curl` ile, seed verisiyle:
 
@@ -80,6 +92,7 @@ Docker'daki Apache üzerinde `curl` ile, seed verisiyle:
 - Takvim satırı ekleme, çakışan satırın reddi, izin ekleme (çakışan randevu uyarısı), doktorun "Tamamlandı" işaretlemesi.
 - Profil fotoğrafı: PHP içerikli `.png` reddedildi; gerçek PNG rastgele adla `storage/uploads`'a kaydedildi; başka hasta 403, sekreter 200; `storage/` doğrudan erişilemiyor.
 - CSRF jetonsuz POST → 403.
+- `admin` / `asdf1234` girişi → `/admin`; tüm paneller 200. JSON ile poliklinik oluşturma 201, aynı ad 422, jetonsuz 403; formla doktor oluşturma → takvim sayfasına yönlendirme.
 
 **Yapılmayanlar:** 375 px genişlikte görsel kontrol bir tarayıcıda henüz yapılmadı (düzen Bootstrap grid ile
 mobil öncelikli yazıldı; tablolar `table-responsive` içinde).
