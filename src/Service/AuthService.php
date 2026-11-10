@@ -24,6 +24,7 @@ final class AuthService
 
     private ?User $current = null;
     private bool $resolved = false;
+    private mixed $resolvedFor = null;
 
     public function __construct(
         private readonly UserRepositoryInterface $users,
@@ -94,14 +95,18 @@ final class AuthService
         $this->session->destroy();
         $this->current = null;
         $this->resolved = true;
+        $this->resolvedFor = null;
     }
 
     public function user(): ?User
     {
-        if (!$this->resolved) {
-            $id = $this->session->get(self::SESSION_KEY);
+        $id = $this->session->get(self::SESSION_KEY);
+
+        // Oturumdaki kimlik değiştiyse (giriş/çıkış) önbellek geçersizdir
+        if (!$this->resolved || $id !== $this->resolvedFor) {
             $this->current = is_int($id) ? $this->users->find($id) : null;
             $this->resolved = true;
+            $this->resolvedFor = $id;
         }
 
         return $this->current;
@@ -122,5 +127,6 @@ final class AuthService
         $this->session->set(self::SESSION_KEY, $user->id());
         $this->current = $user;
         $this->resolved = true;
+        $this->resolvedFor = $user->id();
     }
 }

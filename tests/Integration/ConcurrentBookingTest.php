@@ -70,16 +70,18 @@ final class ConcurrentBookingTest extends AppTestCase
     }
 
     /**
-     * Karşılaştırma: kilit kaldırıldığında aynı senaryo çift randevuya yol açar.
+     * Karşılaştırma: kilit kaldırıldığında iki istek de "boş" görüp "kaydedildi" yanıtı alır.
+     * Sonuç zamanlamaya göre ya çift randevudur ya da son yazanın diğerinin kaydını ezmesidir
+     * (kayıp güncelleme: hasta randevusu olduğunu sanır ama kayıt yoktur). İkisi de hatadır.
      * Bu test, yukarıdaki testin kilidi gerçekten sınadığını gösterir.
      */
-    public function testWithoutLockingBothRequestsWouldSucceed(): void
+    public function testWithoutLockingBothRequestsAreWronglyAccepted(): void
     {
         $doctor = $this->doctor();
 
         $outputs = $this->bookSimultaneously($doctor->id(), useLock: false);
 
-        self::assertSame(['BOOKED', 'BOOKED'], $outputs);
-        self::assertSame(2, $this->activeAppointmentsInSlot($doctor->id()), 'Kilitsiz: çift randevu oluşur');
+        self::assertSame(['BOOKED', 'BOOKED'], $outputs, 'Kilitsiz: iki hastaya da "randevunuz alındı" denir');
+        self::assertGreaterThanOrEqual(1, $this->activeAppointmentsInSlot($doctor->id()));
     }
 }
