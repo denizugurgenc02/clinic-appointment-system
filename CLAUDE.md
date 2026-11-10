@@ -98,7 +98,7 @@ clinic-appointment-system/
 ├── views/             # Şablonlar (yalnızca gösterim, iş mantığı yok)
 ├── database/          # migration ve seed SQL dosyaları (Aşama 3)
 ├── tests/             # PHPUnit testleri
-├── docs/              # SRS, diyagramlar, ai-gunlugu.md, test raporu
+├── docs/              # SRS, diyagramlar, ai-gunlugu/, test raporu
 ├── composer.json
 └── README.md
 ```
@@ -117,7 +117,7 @@ Docker dosyaları (`Dockerfile`, `docker-compose.yml`, `docker/`) kök dizinde y
 - **AJAX:** En az bir JSON döndüren uç nokta ve onu kullanan JavaScript (slot yükleme).
 - **Eşzamanlılık:** Randevu oluşturma/teklif kabulünde transaction + satır kilidi (`SELECT ... FOR UPDATE`) veya koşullu `UPDATE` / unique kısıt.
 - **Test ve kalite:** Çekirdek problem için **en az 10 PHPUnit testi**; PHPStan ile statik analiz (hatasız); gereksinim-test izlenebilirlik tablosu.
-- **Süreç:** GitHub deposu, anlamlı commit geçmişi, pull request ile çalışma, GitHub Projects panosu (her kart bir gereksinim numarasına bağlı), `docs/ai-gunlugu.md`, kurulum talimatlı README.
+- **Süreç:** GitHub deposu, anlamlı commit geçmişi, pull request ile çalışma, GitHub Projects panosu (her kart bir gereksinim numarasına bağlı), `docs/ai-gunlugu/`, kurulum talimatlı README.
 
 ## Dönem Planı
 
@@ -132,7 +132,7 @@ Docker dosyaları (`Dockerfile`, `docker-compose.yml`, `docker/`) kök dizinde y
 - Her değişiklikten sonra: çalıştır → PHPUnit → PHPStan → commit.
 - İş mantığını controller'a veya view'a yazma; framework kodu önerme; güvenlik kontrollerini (yetki, CSRF, kaçış) atlama; eşzamanlılığı görmezden gelme; eski/kullanımdan kalkmış PHP fonksiyonları kullanma.
 - Zaman/saat gerektiren mantık test edilebilir olmalı (ör. şimdiki zamanı dışarıdan alan bir `Clock` arayüzü).
-- **AI günlüğü:** Önemli AI kullanımları `docs/ai-gunlugu.md` dosyasına eklenir: tarih, amaç, istem özeti, sonuç, değiştirilen/reddedilen kısım ve nedeni. AI'ın yanıldığı ve yakalanan durumlar özellikle not edilir.
+- **AI günlüğü:** `docs/ai-gunlugu/` klasöründe her AI oturumu ayrı bir dosyadır: `NNN-gg.aa.yyyy.md`, başlık `# #NNN - gg.aa.yyyy`. Oturumdaki her önemli etkileşim için istem özeti, sonuç, kabul edilen/değiştirilen/reddedilen kısım ve nedeni yazılır; AI'ın yanıldığı ve yakalanan durumlar özellikle not edilir. Şablon ve oturum dizini `docs/ai-gunlugu/README.md` içindedir; yeni oturumda dizin tablosu da güncellenir. Claude Code oturumlarında günlük kaydı oturum boyunca güncel tutulur.
 
 ### Git
 
