@@ -1,6 +1,6 @@
 # Klinik Randevu Sistemi Tasarım Belgesi
 
-> **Sürüm:** Aşama 2 revizyonu (10.11.2026). Sunum 1 sonrası bölümler arasındaki çelişkiler giderildi ve
+> **Sürüm:** Aşama 2 revizyonu (10.11.2026). Aşama 2 uygulaması tamamlandı; test durumu `docs/test-raporu.md`. Sunum 1 sonrası bölümler arasındaki çelişkiler giderildi ve
 > kararlar netleştirildi (bkz. `docs/ai-gunlugu/004-10.11.2026.md`). Sunum 1'deki sürüm git geçmişindedir.
 >
 > **Aşama 2 kapsamı:** Veritabanı bağlantısı **yoktur**. Veriler `storage/data/*.json` dosyalarında tutulur ve
@@ -631,7 +631,8 @@ flowchart TB
     WAIT --- w3(["status"]):::oznitelik
     WAIT --- w4(["created_at"]):::oznitelik
     WAIT --- w5(["offered_starts_at"]):::oznitelik
-    WAIT --- w6(["offer_expires_at"]):::oznitelik
+    WAIT --- w6(["offered_ends_at"]):::oznitelik
+    WAIT --- w7(["offer_expires_at"]):::oznitelik
 
     classDef varlik fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111
     classDef iliski fill:#fef3c7,stroke:#b45309,stroke-width:2px,color:#111
@@ -649,7 +650,7 @@ flowchart TB
 | `schedules` | id, doctor_id, day_of_week, start_time, end_time | FK doctor_id · day_of_week 1–7 (ISO, 1 = Pazartesi) · end_time > start_time · aynı gün satırları çakışamaz (K3) |
 | `time_off` | id, doctor_id, starts_at, ends_at, reason | FK doctor_id · ends_at > starts_at |
 | `appointments` | id, patient_id, doctor_id, starts_at, ends_at, status, patient_note NULL, created_at, cancelled_at NULL | FK patient_id, doctor_id · status ∈ {booked, completed, cancelled, no_show} · **UNIQUE active_slot_key** (Aşama 3) |
-| `waitlist` | id, patient_id, doctor_id, desired_date NULL, status, created_at, offered_starts_at NULL, offer_expires_at NULL | FK patient_id, doctor_id · status ∈ {waiting, offered, accepted, declined, expired} · INDEX (doctor_id, status, created_at) |
+| `waitlist` | id, patient_id, doctor_id, desired_date NULL, status, created_at, offered_starts_at NULL, offered_ends_at NULL, offer_expires_at NULL | FK patient_id, doctor_id · status ∈ {waiting, offered, accepted, declined, expired} · INDEX (doctor_id, status, created_at) |
 
 **Çift randevuyu veritabanında engellemek (Aşama 3):** MySQL'de kısmi UNIQUE indeks yoktur. İptal edilen satırın slotu kilitlememesi için üretilmiş (generated) sütun kullanılır:
 
@@ -742,19 +743,24 @@ Taslak ekranlar `docs/UI/` altındadır (anasayfa, giriş, kayıt, randevu panel
 | Sekreter paneli | Sekreter | Randevu arama (hasta adı/e-posta) + filtre (poliklinik, doktor, durum, tarih), hasta adına randevu, takvim ve izin yönetimi, bekleme listesi görünümü |
 | Günlük rapor | Sekreter | Seçilen gün için randevu listesi (JOIN), durum bazında toplamlar, iptal oranı, doluluk oranı |
 
-**Uç noktalar (özet)**
+**Uç noktalar** (tam liste: `config/routes.php`)
 
-| Yöntem | Yol | Rol |
+| Yöntem | Yol | Rol (middleware) |
 | --- | --- | --- |
 | GET/POST | `/login`, `/register`; POST `/logout` | Herkes |
+| GET | `/api/doctors?department_id=` → JSON | Hasta, Sekreter |
 | GET | `/api/slots?doctor_id=&week=` → JSON | Hasta, Sekreter |
-| GET | `/appointments/book`, `/appointments` | Hasta |
-| POST | `/appointments`, `/appointments/{id}/cancel`, `/appointments/{id}/reschedule` | Hasta, Sekreter |
-| POST | `/waitlist`, `/waitlist/{id}/accept`, `/waitlist/{id}/decline` | Hasta |
-| GET/POST | `/doctor/appointments`, `/doctor/appointments/{id}/status` | Doktor |
-| GET/POST | `/secretary/appointments`, `/secretary/doctors/{id}/schedule`, `/secretary/doctors/{id}/time-off`, `/secretary/waitlist` | Sekreter |
-| GET | `/reports/daily?date=` | Sekreter |
-| GET/POST | `/profile`, `/profile/photo`; GET `/users/{id}/photo` | Giriş yapmış kullanıcı |
+| GET | `/appointments`, `/appointments/book`; POST `/appointments` | Hasta |
+| GET/POST | `/appointments/{id}/reschedule`; POST `/appointments/{id}/cancel` | Hasta (kendi), Sekreter |
+| POST | `/waitlist`, `/waitlist/{id}/accept`, `/waitlist/{id}/decline`, `/waitlist/{id}/leave` | Hasta |
+| GET | `/doctor?date=`; POST `/doctor/appointments/{id}/status` | Doktor |
+| GET | `/secretary` (arama + filtre), `/secretary/appointments/new`, `/secretary/waitlist`; POST `/secretary/appointments` | Sekreter |
+| GET | `/secretary/doctors`, `/secretary/doctors/{id}` | Sekreter |
+| POST | `/secretary/doctors/{id}/schedules`, `/secretary/schedules/{id}/delete`, `/secretary/doctors/{id}/time-off`, `/secretary/time-off/{id}/delete` | Sekreter |
+| GET | `/reports/daily?date=&department_id=` | Sekreter |
+| GET | `/profile`, `/users/{id}/photo`; POST `/profile/photo` | Giriş yapmış kullanıcı |
+
+GET dışındaki tüm isteklerde CSRF jetonu zorunludur (formlarda `_csrf`, AJAX'ta `X-CSRF-Token`); geçersizse 403.
 
 **Güvenli dosya yükleme (profil fotoğrafı):** `UPLOAD_ERR_OK` kontrolü → boyut ≤ 2 MB → `finfo` ile gerçek MIME türü (jpeg/png/webp beyaz listesi) → `getimagesize` ile görüntü doğrulaması → `bin2hex(random_bytes(16))` + uzantı ile rastgele ad → `storage/uploads/` (public dışı) → `GET /users/{id}/photo` ile doğru `Content-Type` ve `X-Content-Type-Options: nosniff` başlığıyla sunulur.
 
@@ -785,11 +791,11 @@ Taslak ekranlar `docs/UI/` altındadır (anasayfa, giriş, kayıt, randevu panel
 | --- | --- | --- |
 | 0 | Tasarım belgesinin netleştirilmesi (bu belge) | ✅ |
 | 1 | Altyapı: Apache Docker, Router (parametreli yol, middleware), DI Container, Request/Response, Session/Flash/CSRF, View, Clock, EventDispatcher, PHPUnit/PHPStan | ✅ |
-| 2 | Model: varlıklar, enum'lar, `AppointmentCancelled` | ⏳ |
-| 3 | `SlotGenerator` (önce test): izin, öğle boşluğu, satır sınırı, geçmiş, dolu | ⏳ |
-| 4 | Repository arayüzleri + JSON uygulamaları, `FileLockTransactionManager`, `bin/seed.php` (4 poliklinik, 6 doktor) | ⏳ |
-| 5 | `AppointmentService` (alma/iptal/değiştirme), Observer, `WaitlistService`; eşzamanlılık testi | ⏳ |
-| 6 | Kayıt/giriş/çıkış, Auth/Role middleware, profil fotoğrafı yükleme | ⏳ |
-| 7 | Ekranlar: hasta, doktor, sekreter, günlük rapor | ⏳ |
-| 8 | Kalite: ≥10 çekirdek test, PHPStan hatasız, gereksinim-test izlenebilirlik tablosu → **Sunum 2** | ⏳ |
+| 2 | Model: varlıklar, enum'lar, `AppointmentCancelled` | ✅ |
+| 3 | `SlotGenerator` (önce test): izin, öğle boşluğu, satır sınırı, geçmiş, dolu | ✅ |
+| 4 | Repository arayüzleri + JSON uygulamaları, `FileLockTransactionManager`, `bin/seed.php` (5 poliklinik, 7 doktor) | ✅ |
+| 5 | `AppointmentService` (alma/iptal/değiştirme), Observer, `WaitlistService`; eşzamanlılık testi | ✅ |
+| 6 | Kayıt/giriş/çıkış, rol middleware'leri, profil fotoğrafı yükleme | ✅ |
+| 7 | Ekranlar: hasta, doktor, sekreter, günlük rapor | ✅ |
+| 8 | Kalite: 73 test, PHPStan seviye 8 hatasız, izlenebilirlik tablosu (`docs/test-raporu.md`) → **Sunum 2** | ✅ |
 | Aşama 3 | MySQL migration + seed, `Pdo*Repository`, `PdoTransactionManager` → **Final** | ⏳ |
