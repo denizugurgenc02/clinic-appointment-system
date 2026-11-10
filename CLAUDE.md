@@ -3,7 +3,7 @@
 Bu dosya, bu depoda çalışan Claude Code (ve ekipteki diğer AI araçları) için proje bağlamını ve kuralları tanımlar.
 Kaynak belgeler: `docs/proje_description.docx`, `docs/proje_requirements.docx`, `docs/proje_suggestion.docx` (hocanın isterleri).
 
-> Durum: **İlk taslak (init).** Proje henüz iskelet aşamasında; bu dosya ilerledikçe genişletilecek.
+> Durum: **Aşama 2 uygulaması tamamlandı** (tüm özellikler JSON veri katmanıyla çalışıyor; 93 test, PHPStan seviye 8 ve PSR-12 hatasız; yerleşik süper yönetici `admin`). Güncel tasarım: `docs/tasarim.md`, test/izlenebilirlik: `docs/izlenebilirlik.md`. Aşama 2'de veritabanı bağlantısı **yok**; veriler `storage/data/*.json` (`php bin/seed.php` ile doldurulur). Sıradaki: Aşama 3 (PDO + MySQL).
 
 ## Proje Özeti
 
@@ -58,11 +58,10 @@ SMS, e-posta, ödeme ve tıbbi kayıt **yoktur**. Bunlar için kod yazma.
 
 Proje **dockerize** çalışacak; yerelde WAMP/XAMPP/Laragon kurulumu gerekmez.
 
-Planlanan servisler (dosyalar henüz oluşturulmadı):
+Servisler:
 
-- `app` — PHP 8.2+ (Apache veya Nginx + PHP-FPM), Composer içerir. **DocumentRoot = `public/`** (tarayıcıdan yalnızca `public/` erişilebilir olmalı).
-- `db` — MySQL 8 / MariaDB; migration ve seed betikleri `database/` altından çalıştırılır.
-- (Opsiyonel) `phpmyadmin`.
+- `app` — `php:8.2-apache` + Composer, `mod_rewrite`. **DocumentRoot = `public/`** (tarayıcıdan yalnızca `public/` erişilebilir). Port `APP_PORT` (varsayılan 8000).
+- `db` — **Aşama 3'te eklenecek** (MySQL 8); migration ve seed betikleri `database/` altından çalıştırılır.
 
 Kurallar:
 
@@ -98,7 +97,7 @@ clinic-appointment-system/
 ├── views/             # Şablonlar (yalnızca gösterim, iş mantığı yok)
 ├── database/          # migration ve seed SQL dosyaları (Aşama 3)
 ├── tests/             # PHPUnit testleri
-├── docs/              # SRS, diyagramlar, ai-gunlugu.md, test raporu
+├── docs/              # SRS, tasarim.md, izlenebilirlik.md, ai-gunlugu.md (+ ai-gunlugu/), surec-raporu.md
 ├── composer.json
 └── README.md
 ```
@@ -117,7 +116,7 @@ Docker dosyaları (`Dockerfile`, `docker-compose.yml`, `docker/`) kök dizinde y
 - **AJAX:** En az bir JSON döndüren uç nokta ve onu kullanan JavaScript (slot yükleme).
 - **Eşzamanlılık:** Randevu oluşturma/teklif kabulünde transaction + satır kilidi (`SELECT ... FOR UPDATE`) veya koşullu `UPDATE` / unique kısıt.
 - **Test ve kalite:** Çekirdek problem için **en az 10 PHPUnit testi**; PHPStan ile statik analiz (hatasız); gereksinim-test izlenebilirlik tablosu.
-- **Süreç:** GitHub deposu, anlamlı commit geçmişi, pull request ile çalışma, GitHub Projects panosu (her kart bir gereksinim numarasına bağlı), `docs/ai-gunlugu.md`, kurulum talimatlı README.
+- **Süreç:** GitHub deposu, anlamlı commit geçmişi, pull request ile çalışma, GitHub Projects panosu (her kart bir gereksinim numarasına bağlı), `docs/ai-gunlugu/`, kurulum talimatlı README.
 
 ## Dönem Planı
 
@@ -132,7 +131,7 @@ Docker dosyaları (`Dockerfile`, `docker-compose.yml`, `docker/`) kök dizinde y
 - Her değişiklikten sonra: çalıştır → PHPUnit → PHPStan → commit.
 - İş mantığını controller'a veya view'a yazma; framework kodu önerme; güvenlik kontrollerini (yetki, CSRF, kaçış) atlama; eşzamanlılığı görmezden gelme; eski/kullanımdan kalkmış PHP fonksiyonları kullanma.
 - Zaman/saat gerektiren mantık test edilebilir olmalı (ör. şimdiki zamanı dışarıdan alan bir `Clock` arayüzü).
-- **AI günlüğü:** Önemli AI kullanımları `docs/ai-gunlugu.md` dosyasına eklenir: tarih, amaç, istem özeti, sonuç, değiştirilen/reddedilen kısım ve nedeni. AI'ın yanıldığı ve yakalanan durumlar özellikle not edilir.
+- **AI günlüğü:** `docs/ai-gunlugu/` klasöründe her AI oturumu ayrı bir dosyadır: `NNN-gg.aa.yyyy.md`, başlık `# #NNN - gg.aa.yyyy`. Oturumdaki her önemli etkileşim için istem özeti, sonuç, kabul edilen/değiştirilen/reddedilen kısım ve nedeni yazılır; AI'ın yanıldığı ve yakalanan durumlar özellikle not edilir. Oturum dizini ve AI'ın yanıldığı örneklerin özeti `docs/ai-gunlugu.md` (teslim dosyası), şablon `docs/ai-gunlugu/README.md` içindedir; yeni oturumda dizin tablosu da güncellenir. Claude Code oturumlarında günlük kaydı oturum boyunca güncel tutulur.
 
 ### Git
 
@@ -143,11 +142,12 @@ Docker dosyaları (`Dockerfile`, `docker-compose.yml`, `docker/`) kök dizinde y
 
 ## Komutlar
 
-> Docker ve Composer kurulumu yapıldığında doldurulacak.
-
 ```bash
-# docker compose up -d
-# docker compose exec app composer install
-# docker compose exec app vendor/bin/phpunit
-# docker compose exec app vendor/bin/phpstan analyse
+cp .env.example .env
+docker compose up -d --build
+docker compose exec app composer install
+docker compose exec app composer test      # PHPUnit
+docker compose exec app composer analyse   # PHPStan seviye 8 (hatasız olmalı)
 ```
+
+Windows Git Bash'te komutların başına `MSYS_NO_PATHCONV=1` eklenir.

@@ -1,0 +1,2 @@
+# Kabuk betikleri Linux konteynerinde çalışır: her zaman LF satır sonu
+*.sh text eol=lf

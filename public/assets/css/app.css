@@ -1,0 +1,88 @@
+/* Uygulamaya özel stiller. 375 px genişlikte yatay kaydırma olmamalı. */
+html,
+body {
+    overflow-x: hidden;
+}
+
+pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* --- Slot ızgarası ------------------------------------------------------- */
+.slot-day {
+    min-width: 0;
+}
+
+.slot-day-title {
+    font-weight: 600;
+    font-size: 0.875rem;
+    padding: 0.25rem 0;
+    border-bottom: 1px solid var(--bs-border-color);
+    margin-bottom: 0.5rem;
+}
+
+.slot {
+    min-width: 4.25rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.slot-available {
+    color: var(--bs-success);
+    border-color: var(--bs-success);
+    background: #fff;
+}
+
+.slot-available:hover {
+    background: var(--bs-success-bg-subtle);
+}
+
+.slot-booked,
+.slot-booked:disabled {
+    background: var(--bs-secondary-bg);
+    color: var(--bs-secondary-color);
+    border-color: transparent;
+    text-decoration: line-through;
+    opacity: 1;
+}
+
+.slot-selected,
+.slot-selected:hover {
+    background: var(--bs-primary);
+    border-color: var(--bs-primary);
+    color: #fff;
+}
+
+.legend {
+    display: inline-block;
+    width: 0.9rem;
+    height: 0.9rem;
+    border-radius: 0.2rem;
+    vertical-align: -0.1rem;
+}
+
+.legend-available { border: 1px solid var(--bs-success); background: #fff; }
+.legend-booked { background: var(--bs-secondary-bg); }
+.legend-selected { background: var(--bs-primary); }
+
+/* --- Profil fotoğrafı ---------------------------------------------------- */
+.avatar {
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.avatar-sm { width: 1.75rem; height: 1.75rem; }
+.avatar-lg { width: 8rem; height: 8rem; }
+
+.avatar-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bs-secondary-bg);
+    font-size: 1.5rem;
+}
+
+.avatar-lg.avatar-placeholder { font-size: 3rem; }

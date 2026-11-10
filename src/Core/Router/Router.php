@@ -1,55 +1,149 @@
 <?php
+
+declare(strict_types=1);
+
 namespace App\Core\Router;
 
 use App\Core\Container;
+use App\Core\Exception\HttpException;
+use App\Core\Http\Request;
+use App\Core\Http\Response;
+use App\Core\Middleware\MiddlewareInterface;
+use Closure;
+use LogicException;
 
-class Router 
+/**
+ * İsteği yol ve yönteme göre ilgili controller metoduna yönlendirir.
+ *
+ * Akış: global middleware -> rota middleware -> controller.
+ * Controller'lar DI konteynerinden üretilir ve her zaman Response döndürür.
+ */
+final class Router
 {
+    /** @var list<Route> */
     private array $routes = [];
-    private Container $container;
 
-    public function __construct(Container $container) 
+    /** @var list<class-string<MiddlewareInterface>> */
+    private array $globalMiddleware = [];
+
+    public function __construct(private readonly Container $container)
     {
-        $this->container = $container;
     }
 
-    public function get(string $path, array|callable $callback): void 
+    /**
+     * @param array{0: class-string, 1: string}|Closure $handler
+     */
+    public function get(string $pattern, array|Closure $handler): Route
     {
-        $this->routes['get'][$path] = $callback;
+        return $this->add('GET', $pattern, $handler);
     }
 
-    public function post(string $path, array|callable $callback): void 
+    /**
+     * @param array{0: class-string, 1: string}|Closure $handler
+     */
+    public function post(string $pattern, array|Closure $handler): Route
     {
-        $this->routes['post'][$path] = $callback;
+        return $this->add('POST', $pattern, $handler);
     }
 
-    public function dispatch(Request $request): void 
+    /**
+     * @param class-string<MiddlewareInterface> $middleware
+     */
+    public function addGlobalMiddleware(string $middleware): void
     {
-        $path = $request->getPath();
-        $method = $request->getMethod();
+        $this->globalMiddleware[] = $middleware;
+    }
 
-        $callback = $this->routes[$method][$path] ?? false;
+    /**
+     * @return list<Route>
+     */
+    public function routes(): array
+    {
+        return $this->routes;
+    }
 
-        if ($callback === false) {
-            // Rota bulunamadı (404)
-            http_response_code(404);
-            echo "<h1>404 - Sayfa Bulunamadı</h1><p>Aradığınız adres ({$path}) sistemde mevcut değil.</p>";
-            return;
+    public function dispatch(Request $request): Response
+    {
+        $path = $request->path();
+        $allowedMethods = [];
+
+        foreach ($this->routes as $route) {
+            $params = $route->match($path);
+            if ($params === null) {
+                continue;
+            }
+
+            if ($route->method() !== $request->method()) {
+                $allowedMethods[] = $route->method();
+                continue;
+            }
+
+            $middleware = [...$this->globalMiddleware, ...$route->middlewareList()];
+
+            return $this->runPipeline(
+                $middleware,
+                $request->withRouteParams($params),
+                fn (Request $r): Response => $this->callHandler($route, $r),
+            );
         }
 
-        // Eğer callback bir dizi [ControllerClass::class, 'method'] ise
-        if (is_array($callback)) {
-            $controllerClass = $callback[0];
-            $methodName = $callback[1];
-
-            // DI Container üzerinden Controller'ı bağımlılıklarıyla birlikte üret
-            $controller = $this->container->get($controllerClass);
-            
-            call_user_func([$controller, $methodName]);
-            return;
+        if ($allowedMethods !== []) {
+            throw HttpException::methodNotAllowed(array_values(array_unique($allowedMethods)));
         }
 
-        // Eğer closure (anonim fonksiyon) ise direkt çalıştır
-        call_user_func($callback);
+        throw HttpException::notFound();
+    }
+
+    /**
+     * @param array{0: class-string, 1: string}|Closure $handler
+     */
+    private function add(string $method, string $pattern, array|Closure $handler): Route
+    {
+        $route = new Route($method, $pattern, $handler);
+        $this->routes[] = $route;
+
+        return $route;
+    }
+
+    /**
+     * Middleware'leri soğan katmanları gibi sarar: ilk eklenen en dışta çalışır.
+     *
+     * @param list<class-string<MiddlewareInterface>> $middleware
+     * @param Closure(Request): Response              $core
+     */
+    private function runPipeline(array $middleware, Request $request, Closure $core): Response
+    {
+        $next = $core;
+
+        foreach (array_reverse($middleware) as $class) {
+            $instance = $this->container->get($class);
+            $next = static fn (Request $r): Response => $instance->process($r, $next);
+        }
+
+        return $next($request);
+    }
+
+    private function callHandler(Route $route, Request $request): Response
+    {
+        $handler = $route->handler();
+
+        if ($handler instanceof Closure) {
+            $response = $handler($request);
+        } else {
+            [$class, $method] = $handler;
+            $controller = $this->container->get($class);
+
+            if (!method_exists($controller, $method)) {
+                throw new LogicException(sprintf('%s::%s metodu bulunamadı.', $class, $method));
+            }
+
+            $response = $controller->{$method}($request);
+        }
+
+        if (!$response instanceof Response) {
+            throw new LogicException(sprintf('"%s" rotasının işleyicisi Response döndürmeli.', $route->pattern()));
+        }
+
+        return $response;
     }
 }

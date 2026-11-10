@@ -1,0 +1,108 @@
+Aşama 2 Ödevi: Veritabanısız Çalışan Prototip
+Ödevin amacı
+Bu ödevde, Aşama 1’de hazırladığınız gereksinim ve tasarım belgelerini çalışan bir PHP prototipine dönüştürmeniz beklenmektedir. Prototipiniz bir veritabanına bağlanmadan çalışmalı; verileri JSON dosyalarında saklamalı; projenizin çekirdek problemini çözmeli ve bu çözümü testlerle doğrulamalıdır.
+
+Sizlerden yalnızca çalışan ekranlar hazırlamanızı değil, uygulamanızın nasıl çalıştığını ve neden bu şekilde tasarlandığını açıklayabilmenizi de bekliyorum. Grup üyelerinin her biri projeye katkıda bulunmalı ve kendi katkısını savunabilmelidir.
+
+1. Çalışan prototip
+Ödevinizi teslim ederken aşağıdaki özelliklere sahip, çalıştırılabilir bir prototip sunmalısınız:
+
+Uygulamanız PHP 8.2 veya üzeri bir sürümde çalışmalıdır.
+Composer kullanılmalı; sınıflar PSR-4 otomatik yükleme ile yüklenmelidir.
+Kodunuz namespace kullanmalı ve PSR-12 kod biçimine uymalıdır.
+Laravel veya Symfony gibi bir PHP çatısı kullanmamalısınız. Bootstrap gibi bir CSS kütüphanesi kullanabilirsiniz.
+Tarayıcıdan erişilen PHP dosyaları tek bir giriş noktasından yönlendirilmelidir. Uygulamanızda router, controller, service, repository ve view sorumlulukları birbirinden ayrılmalıdır.
+Formda hata oluştuğunda kullanıcıya anlaşılır bir mesaj gösterilmeli ve daha önce girdiği geçerli değerler korunmalıdır.
+Başarılı bir form gönderiminden sonra sayfa yenilendiğinde aynı işlem ikinci kez yapılmamalıdır. Bunun için POST-Redirect-GET (PRG) akışını ve gerektiğinde flash mesajları kullanmalısınız.
+Uygulamanızda kayıt, giriş ve çıkış işlevleri bulunmalıdır. Parolalar password_hash ile saklanmalıdır.
+En az iki rol tanımlamalı veya kullanıcıların yalnızca kendilerine ait verilere erişmesini sağlamalısınız. Her işlemde ilgili rol veya sahiplik kontrolünü yapmalısınız.
+Uygulamanızın gösterilebilmesi için bin/seed.php gibi bir başlangıç verisi yükleme yöntemi sağlamalısınız. Prototipinizi sunumda boş verilerle bırakmamalısınız.
+2. JSON ile veri saklama ve Repository yapısı
+Aşama 2’de MySQL veya başka bir veritabanı kullanmayacaksınız. Uygulamanızın kalıcı verileri storage/ gibi bir klasördeki JSON dosyalarında tutulmalıdır.
+
+Veri erişimini Repository katmanında toplamalısınız:
+
+Her Repository için bir arayüz tanımlayın.
+JSON kullanan Repository sınıfları bu arayüzleri uygulasın.
+Servisler somut JSON Repository sınıflarına değil, Repository arayüzlerine bağımlı olsun.
+Veriyi okuma, doğrulama ve yazma sırasında oluşabilecek hataları ele alın.
+Eşzamanlı yazma ihtimali bulunan dosyalarda dosya kilidi (flock) kullanın. Veriyi doğrudan asıl dosyaya yazmak yerine geçici dosyaya yazıp ardından dosyayı güvenli biçimde değiştirin.
+Dosya yükleme özelliğiniz varsa yüklenen dosyanın türünü ve boyutunu denetleyin; kullanıcıdan gelen dosya adını doğrudan kullanmayın ve rastgele bir dosya adı üretin.
+Bu yapının amacı, Aşama 3’te JSON Repository yerine MySQL Repository kullanabilmenizdir. Veritabanı değiştiğinde controller ve servis kodunuzun büyük ölçüde aynı kalması beklenmektedir.
+
+3. Çekirdek problem ve testler
+Proje kartınızda belirtilen çekirdek problemi uygulamanızın en önemli işlevsel parçası olarak ele alın. Sadece ekleme, listeleme, güncelleme ve silme ekranları hazırlamak yeterli değildir; projenizin zor ve ayırt edici kuralını çalışan kodla göstermelisiniz.
+
+Çekirdek problemle ilgili testleri PHPUnit ile yazın.
+Testleriniz Aşama 1’deki kullanıcı hikâyeleri, işlevsel gereksinimler ve kabul kriterleriyle ilişkili olmalıdır.
+docs kalsörü altında izlenebilirlik adlı bir soyada kullanıcı hikâyesi veya gereksinim ile ilgili testleri eşleştirin.
+Testlerde olağan durumların yanında geçersiz girdileri ve sınır durumlarını da kontrol edin.
+Testler tekrarlanabilir olmalıdır. Gerçek saate veya kontrol edilemeyen rastgeleliğe bağlı projelerde bu bağımlılıkları test sırasında denetlenebilir hâle getirin.
+Testlerde gerçek JSON dosyalarını değiştirmek yerine mümkün olduğunda bellekte çalışan sahte Repository kullanın.
+Testlerin gerçekten ilgili davranışı ölçtüğünü doğrulayın. Önemli bir kuralı geçici olarak bozduğunuzda ilgili testin başarısız olduğunu gösterin.
+Genel beklenti en az 10 testin geçmesidir. Proje kartınız daha yüksek bir sayı belirtiyorsa o sayıyı karşılamalısınız. Örneğin, Türk Daması projesinde kural motoru için en az 15 test beklenmektedir.
+Testleri vendor/bin/phpunit komutuyla çalıştırılabilir hâle getirin.
+4. Kullanıcıya gösterilen davranış ve güvenlik
+Uygulamanız hata durumlarında da öngörülebilir davranmalıdır:
+
+Form girdilerini sunucu tarafında doğrulayın.
+Kullanıcının yetkisi olmayan işlemleri reddedin. URL’deki veya formdaki bir id değerini değiştirerek başka bir kullanıcının verisine erişilememelidir.
+Kullanıcıya teknik ayrıntı, dosya yolu, SQL benzeri iç bilgi veya yığın izi göstermeyin. Kullanıcıya sade bir hata mesajı gösterin; hata ayrıntılarını sunucu tarafında kaydedin.
+HTML çıktısına yazılan kullanıcı verilerini htmlspecialchars veya eşdeğer bir yardımcıyla kaçışlayın.
+AJAX veya JSON uç noktası kullanıyorsanız, beklenmeyen bir HTTP yanıtında arayüzünüz uygun hata mesajı göstermelidir.
+Proje kartınızda AJAX veya belirli bir eşzamanlılık riski bulunuyorsa, bu gereksinimi proje kartındaki koşullara göre uygulayın ve test edin.
+5. Kısmi yenileme
+Uygulamanızda sayfanın tamamını yenilemeden güncellenmesi anlamlı olan bir bölüm belirleyin. Örneğin bu bölüm oyun hamlesi, kalan süre, güncel fiyat, rezervasyon durumu veya liste olabilir.
+
+Bu bölüm için JavaScript ile sunucuya istek gönderip JSON yanıtı alarak ilgili ekran parçasını güncelleyin. Sunucu isteğe hata yanıtı verirse kullanıcıya uygun bir mesaj gösterin. Süre veya oyun kuralı gibi güvenlik ve doğruluk açısından önemli kontrolleri yalnızca tarayıcıda yapmayın; sunucu da bu kontrolleri gerçekleştirmelidir. Proje kartınız belirli bir AJAX işlevi tanımlıyorsa kısmi yenilemeyi o işleve uyarlayın.
+
+6. Yapay zekâ kullanımı ve süreç raporu
+Yapay zekâ kullandıysanız kullanımınızı docs klasöründe ai_gunlugu adlı bir dosyada kayıt altına alın. Günlükte hangi iş için yardım aldığınızı, öneriyi nasıl kontrol ettiğinizi, hangi bölümleri değiştirdiğinizi veya reddettiğinizi belirtin. En az bir kayıtta yapay zekânın hatalı veya yetersiz bir önerisini ve bu sorunu nasıl fark edip düzelttiğinizi açıklayın.
+
+Ayrıca docs  klasöründe süreç_gunlugu adlı, 2–4 sayfalık bir süreç raporu hazırlayın. Bu raporda:
+
+Projenizin ne yaptığını ve çekirdek probleminin ne olduğunu açıklayın.
+Aşama 2 boyunca yaptığınız işleri haftalara göre ve işi yapan grup üyeleriyle birlikte özetleyin.
+En az üç tasarım veya uygulama kararınızı, değerlendirdiğiniz alternatiflerle ve karar gerekçelerinizle anlatın.
+Yapay zekâ günlüğünüzden üç örnek verin; bunlardan en az biri yapay zekânın yanıldığı ve grubunuzun hatayı fark ettiği bir örnek olsun.
+Test sayısını, önemli bir sınır durumunu, izlenebilirlik tablonuzun konumunu ve varsa PHPStan sonucunu belirtin.
+Karşılaştığınız üç önemli sorunu ve bunları nasıl çözdüğünüzü yazın.
+Eleştirmen grubun geri bildirimlerini, kabul edip uyguladığınız önerileri ve katılmadığınız önerilerin gerekçelerini belirtin. İlgili GitHub Issue ve pull request bağlantılarını ekleyin.
+Grup üyelerinin katkılarını commit ve pull request’lere dayanarak açıklayın.
+Aşama 3’te MySQL’e geçerken hangi Repository sınıflarının değişeceğini, hangi riskleri gördüğünüzü ve mimarinizin bu geçişi nasıl desteklediğini belirtin.
+7. Git ve grup çalışması
+Çalışmanızı GitHub deposunda yürütün:
+
+main dalını koruyun; işleri ayrı dallarda geliştirin.
+Değişiklikleri pull request ile birleştirin ve en az bir grup arkadaşınızdan inceleme alın.
+Her grup üyesi kendi GitHub hesabıyla katkı sağlamalı; commit ve pull request geçmişi katkıların izlenebilmesini sağlamalıdır.
+İnceleme sırasında tespit edilen sorunları somut biçimde yazın. Geri bildirime yanıtınızı ve yaptığınız düzeltmeleri issue ve pull request bağlantılarıyla raporlayın.
+8. Teslim içeriği
+Ödevinizi teslim ederken GitHub deponuzda aşağıdaki dosya ve içeriklerin bulunmasını sağlayın:
+
+Kurulum ve çalıştırma adımlarını içeren ayrıntılı ve anlaşılır README.md
+Composer yapılandırması ve PSR-4 otomatik yükleme ayarları
+Çalışan PHP prototipi ve JSON başlangıç verisi yükleme betiği
+PHPUnit yapılandırması ve testler
+docs/izlenebilirlik.md
+docs/ai-gunlugu.md
+docs/surec-raporu.md
+Her grup üyesinin katkısını gösteren commit ve pull request geçmişi
+Teslim ettiğiniz README.md dosyası, projeyi daha önce kurmamış bir kişinin temiz bir klasörde gerekli adımları izleyerek uygulamayı çalıştırmasına yetecek açıklıkta olmalıdır.
+
+9. Sunum ve bireysel savunma
+Sunumda prototipinizi canlı olarak göstereceksiniz. Demo akışınızı önceden hazırlayın:
+
+Uygulamaya giriş yapın.
+Projenizin çekirdek problemini çalıştırın.
+Bir hata durumunu gösterin ve uygulamanın nasıl davrandığını açıklayın.
+Yetkisiz bir erişim denemesi yapın ve uygulamanın bu isteği nasıl engellediğini gösterin.
+Projeniz için uygun bir kısmi yenileme işlevini gösterin.
+Testlerinizden bir sınır durumu örneği, izlenebilirlik tablonuz ve bir testi bozarak yaptığınız kontrolü açıklayın.
+Yapay zekâ günlüğünüzden, yapay zekânın yanıldığı ve sizin düzelttiğiniz bir örneği anlatın.
+Sunum süresi grup başına15 dakikadır. Projenizi dersten önce mutlaka yükleyin. Sunum sırasında her grup üyesi bir bölüm anlatmalıdır. Sorulara hangi üyenin yanıt vereceğini önceden grup olarak seçmeyeceksiniz; her üye kendi katkısını ve projedeki kodu açıklayabilmelidir. Sunum sırasında herhangi bir dosyadan seçilen bir kod satırını açıklamanız istenebilir.
+
+10. Değerlendirme hakkında
+Değerlendirme ölçütleri: prototip ve canlı gösterim, çekirdek problem, testler ve izlenebilirlik, mimari ve güvenlik, yapay zekâ günlüğü ve süreç raporu, Git ve kod incelemesi, sunum ve savunma.
+
+Puanlama ölçütlerinin ve vize notundaki ağırlıkların kesinleşmesi eğitmen duyurusuna bağlıdır. Bu yönergede açıklanan teslim ve teknik beklentiler, duyurulacak değerlendirme kararlarıyla birlikte uygulanacaktır
