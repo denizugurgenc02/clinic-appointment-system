@@ -5,30 +5,10 @@ declare(strict_types=1);
 namespace Tests\Unit\Core;
 
 use App\Core\Event\EventDispatcher;
-use App\Core\Event\EventListenerInterface;
 use PHPUnit\Framework\TestCase;
-
-final class SomethingHappened
-{
-    public function __construct(public readonly int $id)
-    {
-    }
-}
-
-final class OtherEvent
-{
-}
-
-final class RecordingListener implements EventListenerInterface
-{
-    /** @var list<object> */
-    public array $received = [];
-
-    public function handle(object $event): void
-    {
-        $this->received[] = $event;
-    }
-}
+use Tests\Support\Stub\OtherEvent;
+use Tests\Support\Stub\RecordingListener;
+use Tests\Support\Stub\SomethingHappened;
 
 final class EventDispatcherTest extends TestCase
 {

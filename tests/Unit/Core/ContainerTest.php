@@ -7,40 +7,10 @@ namespace Tests\Unit\Core;
 use App\Core\Container;
 use App\Core\Exception\ContainerException;
 use PHPUnit\Framework\TestCase;
-
-interface GreeterInterface
-{
-    public function greet(): string;
-}
-
-final class TurkishGreeter implements GreeterInterface
-{
-    public function greet(): string
-    {
-        return 'Merhaba';
-    }
-}
-
-final class Greeting
-{
-    public function __construct(public readonly GreeterInterface $greeter, public readonly int $times = 1)
-    {
-    }
-}
-
-final class CycleA
-{
-    public function __construct(public readonly CycleB $b)
-    {
-    }
-}
-
-final class CycleB
-{
-    public function __construct(public readonly CycleA $a)
-    {
-    }
-}
+use Tests\Support\Stub\CycleA;
+use Tests\Support\Stub\GreeterInterface;
+use Tests\Support\Stub\Greeting;
+use Tests\Support\Stub\TurkishGreeter;
 
 final class ContainerTest extends TestCase
 {

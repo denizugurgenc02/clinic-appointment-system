@@ -8,66 +8,14 @@ use App\Core\Container;
 use App\Core\Exception\HttpException;
 use App\Core\Http\Request;
 use App\Core\Http\Response;
-use App\Core\Middleware\MiddlewareInterface;
 use App\Core\Router\Router;
 use LogicException;
 use PHPUnit\Framework\TestCase;
-
-final class StubController
-{
-    public function show(Request $request): Response
-    {
-        return Response::html('randevu:' . $request->param('id'));
-    }
-
-    public function notAResponse(Request $request): string
-    {
-        return 'hata';
-    }
-}
-
-/** Middleware çalışma sırasını kaydeder. */
-final class CallLog
-{
-    /** @var list<string> */
-    public array $calls = [];
-}
-
-final class OuterMiddleware implements MiddlewareInterface
-{
-    public function __construct(private readonly CallLog $log)
-    {
-    }
-
-    public function process(Request $request, callable $next): Response
-    {
-        $this->log->calls[] = 'outer';
-
-        return $next($request);
-    }
-}
-
-final class InnerMiddleware implements MiddlewareInterface
-{
-    public function __construct(private readonly CallLog $log)
-    {
-    }
-
-    public function process(Request $request, callable $next): Response
-    {
-        $this->log->calls[] = 'inner';
-
-        return $next($request);
-    }
-}
-
-final class BlockingMiddleware implements MiddlewareInterface
-{
-    public function process(Request $request, callable $next): Response
-    {
-        throw HttpException::forbidden();
-    }
-}
+use Tests\Support\Stub\BlockingMiddleware;
+use Tests\Support\Stub\CallLog;
+use Tests\Support\Stub\InnerMiddleware;
+use Tests\Support\Stub\OuterMiddleware;
+use Tests\Support\Stub\StubController;
 
 final class RouterTest extends TestCase
 {

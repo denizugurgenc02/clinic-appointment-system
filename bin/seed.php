@@ -64,13 +64,15 @@ $nextWeekday = static function (DateTimeImmutable $from): DateTimeImmutable {
 
 // --- Poliklinikler ---------------------------------------------------------------------------
 $departments = [];
-foreach ([
+foreach (
+    [
     'Dahiliye' => 'İç hastalıkları, genel muayene ve check-up',
     'Kardiyoloji' => 'Kalp ve damar hastalıkları',
     'Göz Hastalıkları' => 'Göz muayenesi, görme ve göz tansiyonu',
     'Ortopedi ve Travmatoloji' => 'Kas, kemik ve eklem hastalıkları',
     'Kulak Burun Boğaz' => 'KBB muayenesi, işitme ve sinüs',
-] as $name => $description) {
+    ] as $name => $description
+) {
     $departments[$name] = $c->get(DepartmentRepositoryInterface::class)->create(new Department(null, $name, $description));
 }
 
@@ -116,7 +118,8 @@ $c->get(UserRepositoryInterface::class)->create(
 
 /** @var list<Patient> $patients */
 $patients = [];
-foreach ([
+foreach (
+    [
     ['Ali Veli', 'hasta@klinik.test', '0532 111 22 33'],
     ['Deniz Aydın', 'deniz.aydin@ornek.test', '0533 222 33 44'],
     ['Burak Yıldız', 'burak.yildiz@ornek.test', '0534 333 44 55'],
@@ -125,7 +128,8 @@ foreach ([
     ['Gizem Polat', 'gizem.polat@ornek.test', '0537 666 77 88'],
     ['Hakan Erdem', 'hakan.erdem@ornek.test', '0538 777 88 99'],
     ['Seda Güneş', 'seda.gunes@ornek.test', '0539 888 99 00'],
-] as [$name, $email, $phone]) {
+    ] as [$name, $email, $phone]
+) {
     $patients[] = $c->get(PatientRepositoryInterface::class)->create(
         new Patient(null, $name, $email, $password, $phone, null, $now->modify('-30 days')),
     );

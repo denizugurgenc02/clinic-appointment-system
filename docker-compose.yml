@@ -8,6 +8,6 @@ services:
       - .:/var/www/html
     environment:
       APP_ENV: ${APP_ENV:-development}
-      APP_DEBUG: ${APP_DEBUG:-1}
+      APP_DEBUG: ${APP_DEBUG:-0}
 
 # Aşama 3'te MySQL servisi (db) buraya eklenecek. Aşama 2'de veri storage/data/*.json dosyalarındadır.
