@@ -34,6 +34,8 @@ docker compose up -d --build
 
 Durdurmak için: `docker compose down`
 
+Testleri çalıştırmak için: `docker compose exec app vendor/bin/phpunit`
+
 ## Giriş Bilgileri
 
 **Süper yönetici:** kullanıcı adı **`admin`**, şifre **`asdf1234`**. Tüm işlemlere yetkilidir; uygulamaya gömülüdür,
