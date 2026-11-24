@@ -24,6 +24,7 @@ dosyada, etkileşim etkileşim kayıt altındadır. Her etkileşimde şunlar yaz
 | [#002](ai-gunlugu/002-14.10.2026.md) | 14.10.2026 | Efe | Belirtilmemiş | Sınıf diyagramı | #3 |
 | [#003](ai-gunlugu/003-14.10.2026.md) | 14.10.2026 | Efe | Belirtilmemiş | Sıralama diyagramı | #6 |
 | [#004](ai-gunlugu/004-10.11.2026.md) | 10.11.2026 | Eren | Claude Code (Opus 5.5) | Tasarımın netleştirilmesi, Aşama 2 prototipinin geliştirilmesi, Phase-2 isterlerine uyum | `asama-2/prototip` |
+| [#005](ai-gunlugu/005-24.11.2026.md) | 24.11.2026 | Eren | Claude Code (Opus 5.5) | Hocanın istediği toplu proje dokümanı | `docs/proje-dokumani.md` |
 
 > Eski tek dosyalı günlükteki kayıtlar 3, 5, 6, 7, 8 ve 9 numaralıydı; 1, 2 ve 4 numaralı kayıtlar o dosyada da yoktu.
 > Kayıtlar içerikleri değiştirilmeden oturumlara taşındı.
